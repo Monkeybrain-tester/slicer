@@ -10,4 +10,4 @@ git clone <repository url>
 git pull
 
 then whenever you commit
-git commit
+git commit -m "commit message goes in this string"
