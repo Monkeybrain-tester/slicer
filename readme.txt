@@ -1,13 +1,9 @@
-You SHOULD be able to setup the github and pull this project DIRECTLY into your godot project and it
-will config itself
+This is the repository for the slicer project
 
-just make a new godot project
-right click on res:// in the filessystem window (typically bottom left corner)
-open in terminal
+Setup should be complete for both user branches
 
-run git init
-git clone <repository url>
-git pull
+When you commit to one of your sub-branched do the following
 
-then whenever you commit
-git commit -m "commit message goes in this string"
+git add DirectoryIDidAllMyWorkIn/
+git commit -m "message about all the changes I made"
+git push slicer branchname
