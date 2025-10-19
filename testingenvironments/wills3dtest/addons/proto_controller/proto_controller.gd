@@ -4,7 +4,8 @@
 # Happy prototyping!
 
 extends CharacterBody3D
-
+@onready var camera_main : Camera3D = $Head/Camera3D
+@onready var camera_side : Camera3D = $Head/Camera3D2
 ## Can we move around?
 @export var can_move : bool = true
 ## Are we affected by gravity?
@@ -49,6 +50,9 @@ var look_rotation : Vector2
 var move_speed : float = 0.0
 var freeflying : bool = false
 
+# Added: Slice toggle variable
+var is_sliced : bool = false
+
 ## IMPORTANT REFERENCES
 @onready var head: Node3D = $Head
 @onready var collider: CollisionShape3D = $Collider
@@ -64,17 +68,27 @@ func _unhandled_input(event: InputEvent) -> void:
 		capture_mouse()
 	if Input.is_key_pressed(KEY_ESCAPE):
 		release_mouse()
-	
+
 	# Look around
 	if mouse_captured and event is InputEventMouseMotion:
 		rotate_look(event.relative)
-	
+
 	# Toggle freefly mode
 	if can_freefly and Input.is_action_just_pressed(input_freefly):
 		if not freeflying:
 			enable_freefly()
 		else:
 			disable_freefly()
+	
+	# Fixed: Toggle slice mode with "g" using event.keycode (Godot 4.x)
+	if event is InputEventKey and event.keycode == KEY_G and event.pressed and not event.echo:
+		is_sliced = !is_sliced
+		if is_sliced:
+			camera_side.set_current(true)
+			camera_main.set_current(false)
+		else:
+			camera_main.set_current(true)
+			camera_side.set_current(false)
 
 func _physics_process(delta: float) -> void:
 	# If freeflying, handle freefly and nothing else
@@ -84,7 +98,7 @@ func _physics_process(delta: float) -> void:
 		motion *= freefly_speed * delta
 		move_and_collide(motion)
 		return
-	
+
 	# Apply gravity to velocity
 	if has_gravity:
 		if not is_on_floor():
@@ -97,13 +111,16 @@ func _physics_process(delta: float) -> void:
 
 	# Modify speed based on sprinting
 	if can_sprint and Input.is_action_pressed(input_sprint):
-			move_speed = sprint_speed
+		move_speed = sprint_speed
 	else:
 		move_speed = base_speed
 
 	# Apply desired movement to velocity
 	if can_move:
 		var input_dir := Input.get_vector(input_left, input_right, input_forward, input_back)
+		# Only allow forward/backward movement if sliced mode is on
+		if is_sliced:
+			input_dir.x = 0
 		var move_dir := (transform.basis * Vector3(input_dir.x, 0, input_dir.y)).normalized()
 		if move_dir:
 			velocity.x = move_dir.x * move_speed
@@ -114,10 +131,13 @@ func _physics_process(delta: float) -> void:
 	else:
 		velocity.x = 0
 		velocity.y = 0
-	
+
 	# Use velocity to actually move
 	move_and_slide()
-
+	if is_sliced:
+		var side_offset = Vector3(5, 2, 0)
+		camera_side.global_position = global_position + (global_transform.basis.x * 5) + Vector3.UP * 2
+		camera_side.look_at(global_position, Vector3.UP)
 
 ## Rotate us to look around.
 ## Base of controller rotates around y (left/right). Head rotates around x (up/down).
@@ -131,7 +151,6 @@ func rotate_look(rot_input : Vector2):
 	head.transform.basis = Basis()
 	head.rotate_x(look_rotation.x)
 
-
 func enable_freefly():
 	collider.disabled = true
 	freeflying = true
@@ -141,16 +160,13 @@ func disable_freefly():
 	collider.disabled = false
 	freeflying = false
 
-
 func capture_mouse():
 	Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 	mouse_captured = true
 
-
 func release_mouse():
 	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
 	mouse_captured = false
-
 
 ## Checks if some Input Actions haven't been created.
 ## Disables functionality accordingly.
