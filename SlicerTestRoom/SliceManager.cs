@@ -4,52 +4,41 @@ using System;
 using System.Linq;
 using System.Collections.Generic;
 
-/// <summary>
-/// Hold LMB (slice_aim) to preview a slice as a projected dashed line (Decal).
-/// Release LMB to execute a true infinite plane slice across target meshes,
-/// using SliceMeshUtility.Slice(...). Optional visual cap is generated.
-/// </summary>
 public partial class SliceManager : Node3D
 {
 	// -----------------------------
 	// Scene links / targets
 	// -----------------------------
 	[ExportGroup("Scene Links")]
-	[Export] public NodePath PlayerPath;            // Your Player1 (optional if using camera only)
-	[Export] public NodePath RoomRootPath;          // Parent containing meshes to slice (optional)
-	[Export] public NodePath[] TargetMeshes;        // Explicit MeshInstance3D list (optional)
-
-	[ExportGroup("UI")]
-	[Export] public NodePath CrosshairPath;         // Control with your crosshair script (optional)
+	[Export] public NodePath PlayerPath;
+	[Export] public NodePath RoomRootPath;
+	[Export] public NodePath[] TargetMeshes;
+	[Export] public NodePath CrosshairPath;
 
 	// -----------------------------
-	// Projected dashed guide (Decal)
+	// Projected Guide (Decal)
 	// -----------------------------
 	[ExportGroup("Projected Guide")]
 	[Export] public bool UseProjectedGuide = true;
-	[Export] public Texture2D GuideTexture;         // e.g., res://art/dashed_purple.png
+	[Export] public Texture2D GuideTexture;
 	[Export] public Color GuideTint = new Color(0.9f, 0.5f, 1.0f, 1.0f);
-	[Export] public float GuideHeight = 6.0f;       // local Y size of the decal box
-	[Export] public float GuideThickness = 0.25f;   // local Z size (projection depth)
+	[Export] public float GuideHeight = 6.0f;
+	[Export] public float GuideThickness = 0.25f;
 	[Export] public float MaxPreviewDistance = 200.0f;
 
-	// -----------------------------
-	// Optional translucent plane (off by default)
-	// -----------------------------
+	// Optional translucent plane (debug)
 	[ExportGroup("Legacy Plane Preview")]
-	[Export] public bool ShowPreviewPlane = false;  // keep false; decal is superior in FPS
+	[Export] public bool ShowPreviewPlane = false;
 	[Export] public Color PreviewColor = new Color(0.9f, 0.2f, 0.2f, 0.25f);
 
-	// -----------------------------
 	// Slice visuals & behavior
-	// -----------------------------
 	[ExportGroup("Slice Visuals")]
-	[Export] public bool ShowCap = true;
+	[Export] public bool ShowCap = false;
 	[Export] public Material CapMaterial;
 
 	[ExportGroup("Slice Behavior")]
-	[Export] public bool KeepBackHalf = false;      // Keep back mesh as a sibling copy
-	[Export] public bool ForceVertical = true;      // Zero out Y on the plane normal for vertical slices
+	[Export] public bool KeepBackHalf = false;
+	[Export] public bool ForceVertical = true;
 
 	// -----------------------------
 	// Private state
@@ -59,17 +48,20 @@ public partial class SliceManager : Node3D
 	private Control _crosshair;
 	private Camera3D _cam;
 
-	private Decal _guideDecal;                      // our projected dashed line
-	private MeshInstance3D _previewPlane;           // optional translucent plane (hidden by default)
+	private Decal _guideDecal;
+	private MeshInstance3D _previewPlane;
 	private StandardMaterial3D _previewMat;
 
-	// Last aim plane
-	private Vector3 _aimOrigin;                     // world
-	private Vector3 _aimNormal;                     // world (plane normal = camera RIGHT)
+	private Vector3 _aimOrigin;
+	private Vector3 _aimNormal;
 
-	// -----------------------------
-	// Lifecycle
-	// -----------------------------
+	// 2D slice session
+	private Slice2DLevel _slice2D;
+	private bool _inSliceMode = false;
+	private Vector3 _basisU;
+	private Vector3 _basisV;
+	private Vector3 _startPos3D;
+
 	public override void _Ready()
 	{
 		_player = GetNodeOrNull<CharacterBody3D>(PlayerPath);
@@ -78,9 +70,9 @@ public partial class SliceManager : Node3D
 		_cam = GetViewport()?.GetCamera3D();
 
 		if (_cam == null)
-			GD.PushWarning("[SliceManager] No active Camera3D found. Crosshair alignment may be off.");
+			GD.PushWarning("[SliceManager] No active Camera3D found. Using Player basis as fallback.");
 
-		// If no explicit TargetMeshes, auto-discover MeshInstance3D under RoomRoot
+		// Auto-discover meshes if not manually assigned
 		if ((TargetMeshes == null || TargetMeshes.Length == 0) && _roomRoot != null)
 		{
 			var found = new List<NodePath>();
@@ -89,32 +81,25 @@ public partial class SliceManager : Node3D
 			TargetMeshes = found.ToArray();
 		}
 
-		// Build projected dashed guide decal
-		// Build projected dashed guide decal
-if (UseProjectedGuide)
-{
-	_guideDecal = new Decal { Visible = false };
-	AddChild(_guideDecal);
+		// Guide Decal
+		if (UseProjectedGuide)
+		{
+			_guideDecal = new Decal { Visible = false };
+			AddChild(_guideDecal);
 
-	if (GuideTexture != null)
-	{
-		// Assign textures directly to the Decal node (Godot 4 way)
-		_guideDecal.TextureAlbedo = GuideTexture;
-		_guideDecal.Modulate = GuideTint;           // purple tint
-		_guideDecal.EmissionEnergy = 1.75f;         // optional glow; remove or tweak if too strong
-	}
+			if (GuideTexture != null)
+			{
+				_guideDecal.TextureAlbedo = GuideTexture;
+				_guideDecal.Modulate = GuideTint;
+				_guideDecal.EmissionEnergy = 1.5f;
+			}
 
-	// Optional soft fades so the guide blends nicely
-	_guideDecal.UpperFade = 0.0f;
-	_guideDecal.LowerFade = 0.0f;
-	_guideDecal.NormalFade = 0.0f;
-	// You can also restrict what it projects onto with CullMask if needed.
-	// _guideDecal.CullMask = 0xFFFFFFFF;
-}
+			_guideDecal.UpperFade = 0f;
+			_guideDecal.LowerFade = 0f;
+			_guideDecal.NormalFade = 0f;
+		}
 
-
-
-		// Optional legacy translucent plane (normally off in FPS)
+		// Optional preview plane
 		if (ShowPreviewPlane)
 		{
 			_previewPlane = new MeshInstance3D { Visible = false };
@@ -136,12 +121,20 @@ if (UseProjectedGuide)
 			AddChild(_previewPlane);
 		}
 
-		// Hide crosshair at start
-		if (_crosshair != null) _crosshair.Visible = false;
+		if (_crosshair != null)
+			_crosshair.Visible = false;
 	}
 
 	public override void _Input(InputEvent e)
 	{
+		// Exit from 2D slice
+		if (_inSliceMode)
+		{
+			if (e.IsActionPressed("slice_aim") || (e is InputEventKey k && k.Pressed && k.Keycode == Key.Escape))
+				Exit2DBackTo3D();
+			return;
+		}
+
 		if (e.IsActionPressed("slice_aim"))
 			BeginAim();
 
@@ -151,24 +144,20 @@ if (UseProjectedGuide)
 
 	public override void _Process(double delta)
 	{
-		// While aiming, keep the preview updated to camera/collisions
 		if ((_guideDecal != null && _guideDecal.Visible) ||
 			(_previewPlane != null && _previewPlane.Visible))
-		{
 			UpdatePreview();
-		}
 	}
 
 	// -----------------------------
-	// Aim / Preview
+	// Aiming
 	// -----------------------------
 	private void BeginAim()
 	{
 		if (_crosshair != null) _crosshair.Visible = true;
 		if (_guideDecal != null) _guideDecal.Visible = true;
 		if (_previewPlane != null) _previewPlane.Visible = ShowPreviewPlane;
-
-		UpdatePreview(); // place immediately
+		UpdatePreview();
 	}
 
 	private void EndAimAndSlice()
@@ -177,13 +166,12 @@ if (UseProjectedGuide)
 		if (_guideDecal != null) _guideDecal.Visible = false;
 		if (_previewPlane != null) _previewPlane.Visible = false;
 
-		// Refresh aim from camera so execution matches preview
 		if (_cam != null)
 		{
 			_aimOrigin = _cam.GlobalPosition;
 			_aimNormal = _cam.GlobalTransform.Basis.X;
 		}
-		else if (_player != null)
+		else
 		{
 			_aimOrigin = _player.GlobalPosition;
 			_aimNormal = _player.GlobalTransform.Basis.X;
@@ -193,10 +181,14 @@ if (UseProjectedGuide)
 		_aimNormal = _aimNormal.Normalized();
 
 		Plane worldPlane = new Plane(_aimNormal, _aimOrigin.Dot(_aimNormal));
+		Vector3 forward = (_cam != null ? -_cam.GlobalTransform.Basis.Z : -_player.GlobalTransform.Basis.Z).Normalized();
+		_basisU = forward;
+		_basisV = _aimNormal.Cross(_basisU).Normalized();
+		if (_basisV.LengthSquared() < 1e-6f) _basisV = Vector3.Up;
 
-		// Collect all section points for optional cap
-		var worldSectionPoints = new List<Vector3>();
+		var perMeshLoops = new List<Slice2DLevel.SlicePolygon>();
 
+		// Slice visible meshes (TargetMeshes)
 		foreach (var path in TargetMeshes ?? Array.Empty<NodePath>())
 		{
 			var mi = GetNodeOrNull<MeshInstance3D>(path);
@@ -205,7 +197,6 @@ if (UseProjectedGuide)
 			var sourceAM = ConvertToArrayMesh(mi.Mesh);
 			if (sourceAM == null) continue;
 
-			// Convert world plane to this mesh's local space (3-point method)
 			var toLocal = mi.GlobalTransform.AffineInverse();
 
 			Vector3 origin = _aimOrigin;
@@ -239,23 +230,60 @@ if (UseProjectedGuide)
 				mi.GetParent().AddChild(backNode);
 			}
 
-			if (res.SectionLoop != null && res.SectionLoop.Count > 0)
+			if (res.SectionLoop != null && res.SectionLoop.Count >= 3)
 			{
-				foreach (var lp in res.SectionLoop)
-					worldSectionPoints.Add(mi.GlobalTransform * lp);
+				var sortedWorld = SortLoopOnPlane(worldPlane, res.SectionLoop, mi.GlobalTransform);
+				if (sortedWorld != null && sortedWorld.Count >= 3)
+					perMeshLoops.Add(new Slice2DLevel.SlicePolygon { WorldLoop = sortedWorld });
 			}
 		}
 
-		if (ShowCap && worldSectionPoints.Count >= 3)
+		// Detect and project any other MeshInstance3D in RoomRoot that the plane intersects
+		if (_roomRoot != null)
 		{
-			var capMesh = BuildSortedCap(worldPlane, worldSectionPoints);
-			if (capMesh != null)
+			foreach (var n in _roomRoot.GetChildren())
 			{
-				var capMI = new MeshInstance3D { Mesh = capMesh };
-				if (CapMaterial != null && capMesh.GetSurfaceCount() > 0)
-					capMesh.SurfaceSetMaterial(0, CapMaterial);
-				AddChild(capMI);
+				var mi = n as MeshInstance3D;
+				if (mi == null || mi.Mesh == null) continue;
+
+				// If it's already in TargetMeshes, we already processed it; skipping duplicate work is optional
+				if (TargetMeshes != null && Array.Exists(TargetMeshes, p => GetNodeOrNull<MeshInstance3D>(p) == mi))
+					continue;
+
+				if (AabbIntersectsPlane(mi.GetAabb(), mi.GlobalTransform, worldPlane))
+				{
+					var aabb = mi.GetAabb();
+					var corners = new Vector3[8];
+					for (int i = 0; i < 8; i++)
+						corners[i] = mi.GlobalTransform * aabb.GetEndpoint(i);
+
+					var section = SliceMeshUtility.IntersectAabbWithPlane(corners, worldPlane);
+					if (section != null && section.Count >= 3)
+					{
+						var sortedWorld = SortLoopOnPlane(worldPlane, section, Transform3D.Identity);
+						perMeshLoops.Add(new Slice2DLevel.SlicePolygon { WorldLoop = sortedWorld });
+					}
+				}
 			}
+		}
+
+		// Enter 2D mode
+		if (perMeshLoops.Count > 0)
+		{
+			_inSliceMode = true;
+			_startPos3D = _player.GlobalPosition;
+			_player.Visible = false;
+			_player.SetProcess(false);
+			_player.SetPhysicsProcess(false);
+
+			_slice2D = new Slice2DLevel();
+			GetTree().Root.AddChild(_slice2D);
+			_slice2D.BuildAndEnter(
+				GetTree().Root,
+				_aimOrigin, _basisU, _basisV,
+				perMeshLoops,
+				GuideTint // pass tint to 2D for nicer visuals
+			);
 		}
 	}
 
@@ -263,11 +291,9 @@ if (UseProjectedGuide)
 	{
 		if (_cam == null && _player == null) return;
 
-		// Drive from camera (crosshair center)
 		Vector3 origin = _cam != null ? _cam.GlobalPosition : _player.GlobalPosition;
 		Basis camBasis = _cam != null ? _cam.GlobalTransform.Basis : _player.GlobalTransform.Basis;
 
-		// Plane normal is camera RIGHT → plane extends outward through view
 		_aimNormal = camBasis.X;
 		if (ForceVertical) _aimNormal.Y = 0f;
 		_aimNormal = _aimNormal.Normalized();
@@ -275,67 +301,64 @@ if (UseProjectedGuide)
 		_aimOrigin = origin;
 		Vector3 forward = (-camBasis.Z).Normalized();
 
-		// Raycast forward/back to bound the *visual* guide only
 		var space = GetWorld3D().DirectSpaceState;
-
 		var rayFront = new PhysicsRayQueryParameters3D
 		{
 			From = origin,
-			To = origin + forward * MaxPreviewDistance,
-			CollideWithAreas = false,
-			CollideWithBodies = true
+			To = origin + forward * MaxPreviewDistance
 		};
 		var rayBack = new PhysicsRayQueryParameters3D
 		{
 			From = origin,
-			To = origin - forward * MaxPreviewDistance,
-			CollideWithAreas = false,
-			CollideWithBodies = true
+			To = origin - forward * MaxPreviewDistance
 		};
 
 		var hitF = space.IntersectRay(rayFront);
 		var hitB = space.IntersectRay(rayBack);
 
 		float distFront = (hitF.Count > 0 && hitF.ContainsKey("position")) ? ((Vector3)hitF["position"] - origin).Length() : MaxPreviewDistance;
-		float distBack  = (hitB.Count > 0 && hitB.ContainsKey("position")) ? ((Vector3)hitB["position"] - origin).Length() : MaxPreviewDistance;
+		float distBack = (hitB.Count > 0 && hitB.ContainsKey("position")) ? ((Vector3)hitB["position"] - origin).Length() : MaxPreviewDistance;
 
-		// Basis for guide/plane:
-		// widthAxis (local +X) = forward (so texture stretches along view)
-		// normal    (local +Z for Decal projection) = _aimNormal
-		// heightAxis(local +Y) = normal x width
 		Vector3 widthAxis = forward;
 		Vector3 normal = _aimNormal;
 		Vector3 heightAxis = normal.Cross(widthAxis).Normalized();
 		if (heightAxis.LengthSquared() < 1e-6f) heightAxis = Vector3.Up;
-
-		// Midpoint between hits along forward
 		Vector3 mid = origin + forward * ((distFront - distBack) / 2f);
 
-		// ----- Update DECAL (projected dashed line) -----
 		if (_guideDecal != null && _guideDecal.Visible)
 		{
-			float width = Mathf.Max(0.1f, distFront + distBack); // local X
-			float height = Mathf.Max(0.1f, GuideHeight);         // local Y
-			float depth = Mathf.Max(0.02f, GuideThickness);      // local Z (projection depth)
-
+			float width = Mathf.Max(0.1f, distFront + distBack);
+			float height = Mathf.Max(0.1f, GuideHeight);
+			float depth = Mathf.Max(0.02f, GuideThickness);
 			_guideDecal.Size = new Vector3(width, height, depth);
 
-			// Decal projects along -local Z → put plane normal into +Z
 			Basis decalBasis = new Basis(widthAxis, heightAxis, normal);
 			_guideDecal.GlobalTransform = new Transform3D(decalBasis, mid);
 		}
 
-		// ----- Update optional translucent plane (hidden by default) -----
 		if (_previewPlane != null && _previewPlane.Visible)
 		{
-			// PlaneMesh lies in local XZ with normal +Y
 			if (_previewPlane.Mesh is PlaneMesh pm)
 				pm.Size = new Vector2(Mathf.Max(0.1f, distFront + distBack), 20.0f);
-
-			// Build basis: X=forward(width), Y=normal(plane normal), Z=heightAxis
 			Basis planeBasis = new Basis(widthAxis, normal, heightAxis);
 			_previewPlane.GlobalTransform = new Transform3D(planeBasis, mid);
 		}
+	}
+
+	private void Exit2DBackTo3D()
+	{
+		if (!_inSliceMode || _slice2D == null) return;
+
+		float du = _slice2D.ExitAndGetUDisplacement();
+		Vector3 delta3D = _basisU * du;
+
+		_player.GlobalPosition = _startPos3D + delta3D;
+		_player.Visible = true;
+		_player.SetProcess(true);
+		_player.SetPhysicsProcess(true);
+
+		_inSliceMode = false;
+		_slice2D = null;
 	}
 
 	// -----------------------------
@@ -350,7 +373,6 @@ if (UseProjectedGuide)
 	private static ArrayMesh ConvertToArrayMesh(Mesh mesh)
 	{
 		if (mesh is ArrayMesh am) return am;
-
 		var newAM = new ArrayMesh();
 		int sc = mesh.GetSurfaceCount();
 		for (int s = 0; s < sc; s++)
@@ -361,43 +383,49 @@ if (UseProjectedGuide)
 		return newAM;
 	}
 
-	private ArrayMesh BuildSortedCap(Plane plane, List<Vector3> rawWorldPoints)
+	private List<Vector3> SortLoopOnPlane(Plane plane, List<Vector3> localPts, Transform3D localToWorld)
 	{
-		if (rawWorldPoints == null || rawWorldPoints.Count < 3) return null;
+		if (localPts == null || localPts.Count < 3) return null;
 
 		Vector3 n = plane.Normal.Normalized();
 		Vector3 t = BuildPlaneTangent(n);
 		Vector3 b = n.Cross(t);
 
+		var worldPts = new List<Vector3>(localPts.Count);
 		Vector3 center = Vector3.Zero;
-		foreach (var p in rawWorldPoints) center += p;
-		center /= rawWorldPoints.Count;
-
-		var pts = rawWorldPoints.Select(p =>
+		foreach (var lp in localPts)
 		{
-			Vector3 r = p - center;
-			float u = r.Dot(t);
-			float v = r.Dot(b);
-			float ang = Mathf.Atan2(v, u);
-			return (p, ang);
-		}).OrderBy(x => x.ang).Select(x => x.p).ToList();
-
-		var st = new SurfaceTool();
-		st.Begin(Mesh.PrimitiveType.Triangles);
-
-		for (int i = 0; i < pts.Count; i++)
-		{
-			Vector3 a = pts[i];
-			Vector3 c = pts[(i + 1) % pts.Count];
-
-			st.SetNormal(n); st.AddVertex(center);
-			st.SetNormal(n); st.AddVertex(a);
-			st.SetNormal(n); st.AddVertex(c);
+			var wp = localToWorld * lp;
+			worldPts.Add(wp);
+			center += wp;
 		}
+		center /= worldPts.Count;
 
-		var cap = st.Commit();
-		if (CapMaterial != null && cap.GetSurfaceCount() > 0)
-			cap.SurfaceSetMaterial(0, CapMaterial);
-		return cap;
+		worldPts.Sort((p1, p2) =>
+		{
+			Vector3 r1 = p1 - center;
+			Vector3 r2 = p2 - center;
+			float a1 = Mathf.Atan2(r1.Dot(b), r1.Dot(t));
+			float a2 = Mathf.Atan2(r2.Dot(b), r2.Dot(t));
+			return a1.CompareTo(a2);
+		});
+
+		return worldPts;
+	}
+
+	private bool AabbIntersectsPlane(Aabb box, Transform3D xf, Plane plane)
+	{
+		var corners = new Vector3[8];
+		for (int i = 0; i < 8; i++)
+			corners[i] = xf * box.GetEndpoint(i);
+
+		bool hasPos = false, hasNeg = false;
+		foreach (var c in corners)
+		{
+			float d = plane.DistanceTo(c);
+			if (d > 0) hasPos = true;
+			if (d < 0) hasNeg = true;
+		}
+		return hasPos && hasNeg;
 	}
 }
