@@ -381,12 +381,10 @@ MoveSpeed = 500.0
 JumpVelocity = 600.0
 
 [node name="Playersprite" type="Sprite2D" parent="Player"]
-scale = Vector2(1, 1)
 texture = ExtResource("1_6dlfn")
 
 [node name="Camera2D" type="Camera2D" parent="Player"]
 position = Vector2(400, -150)
-scale = Vector2(1, 1)
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Player"]
 position = Vector2(12.7124, -10.5226)
