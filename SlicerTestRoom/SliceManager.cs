@@ -53,6 +53,8 @@ public partial class SliceManager : Node3D
 	[Export] public bool KeepBackHalf = false;      // Keep back mesh as a sibling copy
 	[Export] public bool ForceVertical = true;      // Zero Y on plane normal for vertical slices
 
+
+
 	// -----------------------------
 	// Private state
 	// -----------------------------
@@ -72,6 +74,11 @@ public partial class SliceManager : Node3D
 	private Vector3 _aimOrigin;   // world
 	private Vector3 _aimNormal;   // world (plane normal = camera RIGHT)
 
+// Reuse these for translation when returning from 2D
+private Vector3 _axisU;  // forward along the plane
+private Vector3 _axisV;  // in-plane up
+
+
 	// -----------------------------
 	// Lifecycle
 	// -----------------------------
@@ -81,6 +88,8 @@ public partial class SliceManager : Node3D
 		_roomRoot = GetNodeOrNull<Node>(RoomRootPath);
 		_crosshair = GetNodeOrNull<Control>(CrosshairPath);
 		_cam = GetViewport()?.GetCamera3D();
+		
+
 
 		if (_cam == null)
 			GD.PushWarning("[SliceManager] No active Camera3D found. Crosshair alignment may be off.");
@@ -184,6 +193,11 @@ public partial class SliceManager : Node3D
 			_aimOrigin = _player.GlobalPosition;
 			_aimNormal = _player.GlobalTransform.Basis.X;
 		}
+		
+		// Build plane basis for 2D projection *once* and keep it
+_axisU = (-(_cam != null ? _cam.GlobalTransform.Basis.Z : _player.GlobalTransform.Basis.Z)).Normalized(); // forward
+_axisV = _aimNormal.Cross(_axisU).Normalized();
+
 
 		if (ForceVertical) _aimNormal.Y = 0f;
 		_aimNormal = _aimNormal.Normalized();
@@ -260,232 +274,248 @@ public partial class SliceManager : Node3D
 		}
 
 		// Optional visual 3D cap (debug)
-		if (ShowCap && allSectionPointsWorld.Count >= 3)
-		{
-			var capMesh = BuildSortedCap(worldPlane, allSectionPointsWorld);
-			if (capMesh != null)
-			{
-				var capMI = new MeshInstance3D { Mesh = capMesh };
-				if (CapMaterial != null && capMesh.GetSurfaceCount() > 0)
-					capMesh.SurfaceSetMaterial(0, CapMaterial);
-				AddChild(capMI);
-			}
-		}
-
-		// Launch the separate 2D scene with polygons built from the slice
-		if (allLoops2D.Count > 0)
-			LaunchSlice2D(allLoops2D);
-		else
-			GD.Print("No cross-section polygons found; nothing to play in 2D.");
-	}
-
-	private void UpdatePreview()
+if (ShowCap && allSectionPointsWorld.Count >= 3)
+{
+	var capMesh = BuildSortedCap(worldPlane, allSectionPointsWorld);
+	if (capMesh != null)
 	{
-		if (_cam == null && _player == null) return;
-
-		// Drive from camera (crosshair center)
-		Vector3 origin = _cam != null ? _cam.GlobalPosition : _player.GlobalPosition;
-		Basis camBasis = _cam != null ? _cam.GlobalTransform.Basis : _player.GlobalTransform.Basis;
-
-		// Plane normal is camera RIGHT → plane extends outward through view
-		_aimNormal = camBasis.X;
-		if (ForceVertical) _aimNormal.Y = 0f;
-		_aimNormal = _aimNormal.Normalized();
-
-		_aimOrigin = origin;
-		Vector3 forward = (-camBasis.Z).Normalized();
-
-		// Raycast forward/back to bound the *visual* guide only
-		var space = GetWorld3D().DirectSpaceState;
-
-		var rayFront = new PhysicsRayQueryParameters3D
-		{
-			From = origin,
-			To = origin + forward * MaxPreviewDistance,
-			CollideWithAreas = false,
-			CollideWithBodies = true
-		};
-		var rayBack = new PhysicsRayQueryParameters3D
-		{
-			From = origin,
-			To = origin - forward * MaxPreviewDistance,
-			CollideWithAreas = false,
-			CollideWithBodies = true
-		};
-
-		var hitF = space.IntersectRay(rayFront);
-		var hitB = space.IntersectRay(rayBack);
-
-		float distFront = (hitF.Count > 0 && hitF.ContainsKey("position")) ? ((Vector3)hitF["position"] - origin).Length() : MaxPreviewDistance;
-		float distBack  = (hitB.Count > 0 && hitB.ContainsKey("position")) ? ((Vector3)hitB["position"] - origin).Length() : MaxPreviewDistance;
-
-		// Basis for guide/plane:
-		// widthAxis (local +X) = forward (so texture stretches along view)
-		// normal    (local +Z for Decal projection) = _aimNormal
-		// heightAxis(local +Y) = normal x width
-		Vector3 widthAxis = forward;
-		Vector3 normal = _aimNormal;
-		Vector3 heightAxis = normal.Cross(widthAxis).Normalized();
-		if (heightAxis.LengthSquared() < 1e-6f) heightAxis = Vector3.Up;
-
-		// Midpoint between hits along forward
-		Vector3 mid = origin + forward * ((distFront - distBack) / 2f);
-
-		// ----- Update DECAL (projected dashed line) -----
-		if (_guideDecal != null && _guideDecal.Visible)
-		{
-			float width = Mathf.Max(0.1f, distFront + distBack); // local X
-			float height = Mathf.Max(0.1f, GuideHeight);         // local Y
-			float depth = Mathf.Max(0.02f, GuideThickness);      // local Z (projection depth)
-
-			_guideDecal.Size = new Vector3(width, height, depth);
-
-			// Decal projects along -local Z → put plane normal into +Z
-			Basis decalBasis = new Basis(widthAxis, heightAxis, normal);
-			_guideDecal.GlobalTransform = new Transform3D(decalBasis, mid);
-		}
-
-		// ----- Update optional translucent plane (hidden by default) -----
-		if (_previewPlane != null && _previewPlane.Visible)
-		{
-			// PlaneMesh lies in local XZ with normal +Y
-			if (_previewPlane.Mesh is PlaneMesh pm)
-				pm.Size = new Vector2(Mathf.Max(0.1f, distFront + distBack), 20.0f);
-
-			// Build basis: X=forward(width), Y=normal(plane normal), Z=heightAxis
-			Basis planeBasis = new Basis(widthAxis, normal, heightAxis);
-			_previewPlane.GlobalTransform = new Transform3D(planeBasis, mid);
-		}
-	}
-
-	// -----------------------------
-	// Helpers
-	// -----------------------------
-	private static Vector3 BuildPlaneTangent(Vector3 n)
-	{
-		Vector3 up = MathF.Abs(n.Dot(Vector3.Up)) > 0.99f ? Vector3.Right : Vector3.Up;
-		return up.Cross(n).Normalized();
-	}
-
-	private static ArrayMesh ConvertToArrayMesh(Mesh mesh)
-	{
-		if (mesh is ArrayMesh am) return am;
-
-		var newAM = new ArrayMesh();
-		int sc = mesh.GetSurfaceCount();
-		for (int s = 0; s < sc; s++)
-		{
-			var arrays = mesh.SurfaceGetArrays(s);
-			newAM.AddSurfaceFromArrays(Mesh.PrimitiveType.Triangles, arrays);
-		}
-		return newAM;
-	}
-
-	private ArrayMesh BuildSortedCap(Plane plane, List<Vector3> rawWorldPoints)
-	{
-		if (rawWorldPoints == null || rawWorldPoints.Count < 3) return null;
-
-		Vector3 n = plane.Normal.Normalized();
-		Vector3 t = BuildPlaneTangent(n);
-		Vector3 b = n.Cross(t);
-
-		Vector3 center = Vector3.Zero;
-		foreach (var p in rawWorldPoints) center += p;
-		center /= rawWorldPoints.Count;
-
-		var pts = rawWorldPoints.Select(p =>
-		{
-			Vector3 r = p - center;
-			float u = r.Dot(t);
-			float v = r.Dot(b);
-			float ang = Mathf.Atan2(v, u);
-			return (p, ang);
-		}).OrderBy(x => x.ang).Select(x => x.p).ToList();
-
-		var st = new SurfaceTool();
-		st.Begin(Mesh.PrimitiveType.Triangles);
-
-		for (int i = 0; i < pts.Count; i++)
-		{
-			Vector3 a = pts[i];
-			Vector3 c = pts[(i + 1) % pts.Count];
-
-			st.SetNormal(n); st.AddVertex(center);
-			st.SetNormal(n); st.AddVertex(a);
-			st.SetNormal(n); st.AddVertex(c);
-		}
-
-		var cap = st.Commit();
-		if (CapMaterial != null && cap.GetSurfaceCount() > 0)
-			cap.SurfaceSetMaterial(0, CapMaterial);
-		return cap;
-	}
-
-	// Project a world-space point onto the slice plane basis → 2D (u along forward, v along in-plane up)
-	private Vector2 ProjectWorldPointTo2D(Vector3 worldPoint, Vector3 origin, Vector3 axisU, Vector3 axisV)
-	{
-		Vector3 r = worldPoint - origin;
-		float u = r.Dot(axisU);
-		float v = r.Dot(axisV);
-		return new Vector2(u, v);
-	}
-
-	// Sort a polygon's points CCW in the (u,v) plane around its centroid
-	private List<Vector2> SortLoopCCW(List<Vector2> pts)
-	{
-		if (pts.Count < 3) return pts;
-		Vector2 c = Vector2.Zero;
-		foreach (var p in pts) c += p;
-		c /= pts.Count;
-
-		pts.Sort((a, b) =>
-		{
-			float angA = Mathf.Atan2(a.Y - c.Y, a.X - c.X);
-			float angB = Mathf.Atan2(b.Y - c.Y, b.X - c.X);
-			return angA.CompareTo(angB);
-		});
-		return pts;
-	}
-
-	private void LaunchSlice2D(List<List<Vector2>> polygons2D)
-	{
-		// Load the 2D scene
-		var sliceScene = GD.Load<PackedScene>("res://2Dportion/Slice2D.tscn");
-		var slice = sliceScene.Instantiate<Node2D>() as Node2D;
-
-		// Validate type
-		var level = slice as SliceLevel2D;
-		if (level == null)
-		{
-			GD.PushError("Slice2D.tscn root must have SliceLevel2D.cs attached.");
-			return;
-		}
-
-		level.Polygons2D = polygons2D;
-		level.PlayerStart2D = Vector2.Zero; // start at plane origin (can customize)
-
-		// Add to scene tree above 3D
-		GetTree().CurrentScene.AddChild(slice);
-
-		// Hide 3D player while in 2D (optional)
-		if (_player != null) _player.Visible = false;
-
-		// When exiting 2D, translate the 3D player and re-enable 3D
-		level.Connect(SliceLevel2D.SignalName.SliceExit, new Callable(this, nameof(OnSliceExit2D)));
-	}
-
-	private void OnSliceExit2D(Vector2 delta2D)
-	{
-		// Convert 2D displacement back to 3D along plane: Δ3D = U*dx + V*dy
-		Vector3 axisU = (-(_cam != null ? _cam.GlobalTransform.Basis.Z : _player.GlobalTransform.Basis.Z)).Normalized(); // forward
-		Vector3 axisV = _aimNormal.Cross(axisU).Normalized();
-
-		Vector3 delta3D = axisU * delta2D.X + axisV * delta2D.Y;
-
-		if (_player != null)
-		{
-			_player.GlobalPosition = _aimOrigin + delta3D;
-			_player.Visible = true;
-		}
+		var capMI = new MeshInstance3D { Mesh = capMesh };
+		if (CapMaterial != null && capMesh.GetSurfaceCount() > 0)
+			capMesh.SurfaceSetMaterial(0, CapMaterial);
+		AddChild(capMI);
 	}
 }
+
+	// ---- Compute player start in 2D plane space and launch 2D scene ----
+	Vector2 playerStart2D = ProjectWorldPointTo2D(
+		_player != null ? _player.GlobalPosition : _aimOrigin,
+		_aimOrigin,
+		_axisU, _axisV
+	);
+
+	if (allLoops2D.Count > 0)
+	{
+		GD.Print($"[SliceManager] Loops2D: {allLoops2D.Count}, PlayerStart2D: {playerStart2D}");
+
+		LaunchSlice2D(allLoops2D, playerStart2D);
+	}
+	else
+	{
+		GD.Print("No cross-section polygons found; nothing to play in 2D.");
+	}
+} // <<<------------------------ this closes EndAimAndSlice()
+
+private void UpdatePreview()
+{
+	if (_cam == null && _player == null) return;
+
+	// Drive from camera (crosshair center)
+	Vector3 origin = _cam != null ? _cam.GlobalPosition : _player.GlobalPosition;
+	Basis camBasis = _cam != null ? _cam.GlobalTransform.Basis : _player.GlobalTransform.Basis;
+
+	// Plane normal is camera RIGHT → plane extends outward through view
+	_aimNormal = camBasis.X;
+	if (ForceVertical) _aimNormal.Y = 0f;
+	_aimNormal = _aimNormal.Normalized();
+
+	_aimOrigin = origin;
+	Vector3 forward = (-camBasis.Z).Normalized();
+
+	// Raycast forward/back to bound the *visual* guide only
+	var space = GetWorld3D().DirectSpaceState;
+
+	var rayFront = new PhysicsRayQueryParameters3D
+	{
+		From = origin,
+		To = origin + forward * MaxPreviewDistance,
+		CollideWithAreas = false,
+		CollideWithBodies = true
+	};
+	var rayBack = new PhysicsRayQueryParameters3D
+	{
+		From = origin,
+		To = origin - forward * MaxPreviewDistance,
+		CollideWithAreas = false,
+		CollideWithBodies = true
+	};
+
+	var hitF = space.IntersectRay(rayFront);
+	var hitB = space.IntersectRay(rayBack);
+
+	float distFront = (hitF.Count > 0 && hitF.ContainsKey("position")) ? ((Vector3)hitF["position"] - origin).Length() : MaxPreviewDistance;
+	float distBack  = (hitB.Count > 0 && hitB.ContainsKey("position")) ? ((Vector3)hitB["position"] - origin).Length() : MaxPreviewDistance;
+
+	// Basis for guide/plane:
+	// widthAxis (local +X) = forward (so texture stretches along view)
+	// normal    (local +Z for Decal projection) = _aimNormal
+	// heightAxis(local +Y) = normal x width
+	Vector3 widthAxis = forward;
+	Vector3 normal = _aimNormal;
+	Vector3 heightAxis = normal.Cross(widthAxis).Normalized();
+	if (heightAxis.LengthSquared() < 1e-6f) heightAxis = Vector3.Up;
+
+	// Midpoint between hits along forward
+	Vector3 mid = origin + forward * ((distFront - distBack) / 2f);
+
+	// ----- Update DECAL (projected dashed line) -----
+	if (_guideDecal != null && _guideDecal.Visible)
+	{
+		float width = Mathf.Max(0.1f, distFront + distBack); // local X
+		float height = Mathf.Max(0.1f, GuideHeight);         // local Y
+		float depth = Mathf.Max(0.02f, GuideThickness);      // local Z (projection depth)
+
+		_guideDecal.Size = new Vector3(width, height, depth);
+
+		// Decal projects along -local Z → put plane normal into +Z
+		Basis decalBasis = new Basis(widthAxis, heightAxis, normal);
+		_guideDecal.GlobalTransform = new Transform3D(decalBasis, mid);
+	}
+
+	// ----- Update optional translucent plane (hidden by default) -----
+	if (_previewPlane != null && _previewPlane.Visible)
+	{
+		// PlaneMesh lies in local XZ with normal +Y
+		if (_previewPlane.Mesh is PlaneMesh pm)
+			pm.Size = new Vector2(Mathf.Max(0.1f, distFront + distBack), 20.0f);
+
+		// Build basis: X=forward(width), Y=normal(plane normal), Z=heightAxis
+		Basis planeBasis = new Basis(widthAxis, normal, heightAxis);
+		_previewPlane.GlobalTransform = new Transform3D(planeBasis, mid);
+	}
+}
+
+// -----------------------------
+// Helpers
+// -----------------------------
+private static Vector3 BuildPlaneTangent(Vector3 n)
+{
+	Vector3 up = MathF.Abs(n.Dot(Vector3.Up)) > 0.99f ? Vector3.Right : Vector3.Up;
+	return up.Cross(n).Normalized();
+}
+
+private static ArrayMesh ConvertToArrayMesh(Mesh mesh)
+{
+	if (mesh is ArrayMesh am) return am;
+
+	var newAM = new ArrayMesh();
+	int sc = mesh.GetSurfaceCount();
+	for (int s = 0; s < sc; s++)
+	{
+		var arrays = mesh.SurfaceGetArrays(s);
+		newAM.AddSurfaceFromArrays(Mesh.PrimitiveType.Triangles, arrays);
+	}
+	return newAM;
+}
+
+private ArrayMesh BuildSortedCap(Plane plane, List<Vector3> rawWorldPoints)
+{
+	if (rawWorldPoints == null || rawWorldPoints.Count < 3) return null;
+
+	Vector3 n = plane.Normal.Normalized();
+	Vector3 t = BuildPlaneTangent(n);
+	Vector3 b = n.Cross(t);
+
+	Vector3 center = Vector3.Zero;
+	foreach (var p in rawWorldPoints) center += p;
+	center /= rawWorldPoints.Count;
+
+	var pts = rawWorldPoints.Select(p =>
+	{
+		Vector3 r = p - center;
+		float u = r.Dot(t);
+		float v = r.Dot(b);
+		float ang = Mathf.Atan2(v, u);
+		return (p, ang);
+	}).OrderBy(x => x.ang).Select(x => x.p).ToList();
+
+	var st = new SurfaceTool();
+	st.Begin(Mesh.PrimitiveType.Triangles);
+
+	for (int i = 0; i < pts.Count; i++)
+	{
+		Vector3 a = pts[i];
+		Vector3 c = pts[(i + 1) % pts.Count];
+
+		st.SetNormal(n); st.AddVertex(center);
+		st.SetNormal(n); st.AddVertex(a);
+		st.SetNormal(n); st.AddVertex(c);
+	}
+
+	var cap = st.Commit();
+	if (CapMaterial != null && cap.GetSurfaceCount() > 0)
+		cap.SurfaceSetMaterial(0, CapMaterial);
+	return cap;
+}
+
+// Project a world-space point onto the slice plane basis → 2D (u along forward, v along in-plane up)
+// Project a world point into 2D slice space (Godot 2D: +Y is down)
+private Vector2 ProjectWorldPointTo2D(Vector3 worldPoint, Vector3 origin, Vector3 axisU, Vector3 axisV)
+{
+	Vector3 r = worldPoint - origin;
+	float u = r.Dot(axisU);
+	float v = r.Dot(axisV);
+	return new Vector2(u, -v); // <- flip V for Godot 2D coords
+}
+
+
+// Sort a polygon's points CCW in the (u,v) plane around its centroid
+private List<Vector2> SortLoopCCW(List<Vector2> pts)
+{
+	if (pts.Count < 3) return pts;
+	Vector2 c = Vector2.Zero;
+	foreach (var p in pts) c += p;
+	c /= pts.Count;
+
+	pts.Sort((a, b) =>
+	{
+		float angA = Mathf.Atan2(a.Y - c.Y, a.X - c.X);
+		float angB = Mathf.Atan2(b.Y - c.Y, b.X - c.X);
+		return angA.CompareTo(angB);
+	});
+	return pts;
+}
+
+private void LaunchSlice2D(List<List<Vector2>> polygons2D, Vector2 playerStart2D)
+{
+	var sliceScene = GD.Load<PackedScene>("res://2Dportion/Slice2D.tscn");
+	if (sliceScene == null) { GD.PushError("Slice2D.tscn not found"); return; }
+
+	var slice = sliceScene.Instantiate<Node2D>();
+	var level = slice as SliceLevel2D;
+	if (level == null) { GD.PushError("Slice2D root must have SliceLevel2D.cs"); return; }
+
+	level.Polygons2D = polygons2D;
+	level.PlayerStart2D = playerStart2D;
+
+	(GetTree().CurrentScene ?? GetTree().Root).AddChild(level);
+
+	if (_player != null) _player.Visible = false;
+
+	// Disable 3D camera & free mouse while in 2D
+	if (_cam != null) _cam.Current = false;
+	Input.MouseMode = Input.MouseModeEnum.Visible;
+
+	level.Connect(SliceLevel2D.SignalName.SliceExit, new Callable(this, nameof(OnSliceExit2D)));
+}
+
+
+private void OnSliceExit2D(Vector2 delta2D)
+{
+	// Use the exact axes saved at slice time; unflip V (2D Y is down)
+	Vector3 delta3D = _axisU * delta2D.X + _axisV * (-delta2D.Y);
+
+	if (_player != null)
+	{
+		_player.GlobalPosition = _aimOrigin + delta3D;
+		_player.Visible = true;
+	}
+
+	// Reactivate your 3D camera and FPS mouse
+	if (_cam != null) _cam.Current = true;
+	Input.MouseMode = Input.MouseModeEnum.Captured;
+
+	GD.Print($"[SliceManager] Returned to 3D. Δ3D={delta3D}");
+}
+
+
+} // <<<------------------------ this closes class SliceManager

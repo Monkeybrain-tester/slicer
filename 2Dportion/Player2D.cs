@@ -5,6 +5,8 @@ public partial class Player2D : CharacterBody2D
 	[Export] public float MoveSpeed = 220f;
 	[Export] public float JumpSpeed = 360f;
 	[Export] public float Gravity = 980f;
+	
+	
 
 	public override void _PhysicsProcess(double delta)
 	{

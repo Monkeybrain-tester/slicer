@@ -10,26 +10,23 @@ size = Vector2(5016, 344)
 
 [node name="Slice2D" type="Node2D"]
 script = ExtResource("1_587wl")
+metadata/_edit_vertical_guides_ = [-12548.0]
 
 [node name="World" type="Node2D" parent="."]
 
 [node name="Player2D" type="CharacterBody2D" parent="."]
 script = ExtResource("2_jtocm")
-
-[node name="Camera2D" type="Camera2D" parent="Player2D"]
-
-[node name="CollisionPolygon2D" type="CollisionPolygon2D" parent="Player2D"]
-polygon = PackedVector2Array(3, -192, -53, -169, -100, -98, -110, -12, -95, 70, -56, 134, -31, 156, 47, 158, 97, 117, 130, 48, 142, -19, 124, -94, 94, -153, 42, -188)
-
-[node name="background" type="Sprite2D" parent="Player2D"]
-show_behind_parent = true
-position = Vector2(2183, -1181)
-scale = Vector2(19.3328, 20.2312)
-texture = ExtResource("4_su48r")
+Gravity = 400.0
 
 [node name="Sprite2D" type="Sprite2D" parent="Player2D"]
 top_level = true
 texture = ExtResource("3_qobs4")
+
+[node name="Camera2D" type="Camera2D" parent="Player2D"]
+zoom = Vector2(0.1, 0.1)
+
+[node name="CollisionPolygon2D" type="CollisionPolygon2D" parent="Player2D"]
+polygon = PackedVector2Array(3, -192, -53, -169, -100, -98, -110, -12, -95, 70, -56, 134, -31, 156, 47, 158, 97, 117, 130, 48, 142, -19, 124, -94, 94, -153, 42, -188)
 
 [node name="UI" type="CanvasLayer" parent="."]
 
@@ -38,5 +35,12 @@ offset_right = 40.0
 offset_bottom = 23.0
 
 [node name="debugplatform" type="CollisionShape2D" parent="."]
-position = Vector2(-156, 4408)
+position = Vector2(97, 2328)
 shape = SubResource("RectangleShape2D_su48r")
+
+[node name="background" type="Sprite2D" parent="."]
+show_behind_parent = true
+z_index = -4
+position = Vector2(2081, -2337)
+scale = Vector2(19.3328, 20.2312)
+texture = ExtResource("4_su48r")

@@ -21,6 +21,10 @@ public partial class SliceLevel2D : Node2D
 		// --- attach geometry under "World" ---
 		var world = GetNode<Node2D>("World");
 
+		GD.Print($"[Slice2D] Polygons: {Polygons2D?.Count ?? 0}, Start: {PlayerStart2D}");
+
+		SetProcessInput(true);
+		SetProcessUnhandledInput(true);
 		foreach (var rawPoly in Polygons2D)
 		{
 			var poly = SanitizeLoop(rawPoly, 0.0005f);
@@ -40,14 +44,43 @@ public partial class SliceLevel2D : Node2D
 			AddConvexCollisionFromPolygon(world, poly, Scale2D);
 		}
 
+	// --- Debug cross at player start ---
+	var cross = new Line2D { Width = 2 };
+	cross.AddPoint(PlayerStart2D * Scale2D + new Vector2(-8, 0));
+	cross.AddPoint(PlayerStart2D * Scale2D + new Vector2(8, 0));
+	cross.AddPoint(PlayerStart2D * Scale2D + new Vector2(0, -8));
+	cross.AddPoint(PlayerStart2D * Scale2D + new Vector2(0, 8));
+	world.AddChild(cross);
+
+	// --- Debug print polygon bounds ---
+	foreach (var raw in Polygons2D)
+	{
+		if (raw.Count < 3) continue;
+		var min = new Vector2(float.MaxValue, float.MaxValue);
+		var max = new Vector2(float.MinValue, float.MinValue);
+		foreach (var p in raw)
+		{
+			min = min.Min(p);
+			max = max.Max(p);
+		}
+		GD.Print($"[Slice2D] loop AABB min={min} max={max}");
+	}
+
+	GD.Print($"[Slice2D] PlayerStart2D(px) = {PlayerStart2D * Scale2D}");
+
+
 		// Player
 		_player = GetNode<CharacterBody2D>("Player2D");
-		_player.Position = PlayerStart2D * Scale2D;
-		_startPos = _player.Position;
+_player.Position = PlayerStart2D * Scale2D;
+_startPos = _player.Position;
 
-		// Camera (Godot 4 C#)
-		var cam = _player.GetNode<Camera2D>("Camera2D");
-		cam.MakeCurrent();
+var cam = _player.GetNode<Camera2D>("Camera2D");
+cam.PositionSmoothingEnabled = false;   // turn off while debugging
+cam.MakeCurrent();
+cam.Offset = Vector2.Zero;
+cam.Zoom = Vector2.One;                 // 1:1 scale
+
+
 
 		// UI hint (optional)
 		var label = GetNodeOrNull<Label>("UI/Label");
@@ -55,15 +88,24 @@ public partial class SliceLevel2D : Node2D
 	}
 
 	public override void _UnhandledInput(InputEvent e)
-	{
-		// Reuse the same action to exit
-		if (e.IsActionPressed("slice_aim"))
-		{
-			var delta2D = (_player.Position - _startPos) / Scale2D;
-			EmitSignal(SignalName.SliceExit, delta2D);
-			QueueFree();
-		}
-	}
+{
+	// Accept several inputs to exit:
+	bool wantExit =
+		Input.IsActionJustPressed("slice_exit") ||
+		Input.IsActionJustPressed("slice_aim") ||      // reuse LMB if you like
+		Input.IsActionJustPressed("ui_cancel") ||      // ESC
+		(e is InputEventMouseButton mb && mb.ButtonIndex == MouseButton.Left && mb.Pressed);
+
+	if (!wantExit) return;
+
+	var delta2D = (_player.Position - _startPos) / Scale2D;
+	GD.Print($"[Slice2D] Exit requested, delta2D={delta2D}");
+	EmitSignal(SignalName.SliceExit, delta2D);
+
+	// consume and close
+	GetViewport().SetInputAsHandled();
+	QueueFree();
+}
 
 	// -----------------------------
 	// Helpers (geometry & collision)
