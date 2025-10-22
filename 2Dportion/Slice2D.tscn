@@ -1,0 +1,46 @@
+[gd_scene load_steps=6 format=3 uid="uid://bmxp3otjsaxcv"]
+
+[ext_resource type="Script" uid="uid://uuuff314mwyx" path="res://SliceLevel2D.cs" id="1_587wl"]
+[ext_resource type="Script" uid="uid://byrd61wydrf6" path="res://2Dportion/Player2D.cs" id="2_jtocm"]
+[ext_resource type="Texture2D" uid="uid://cm80umwyhsyqf" path="res://testingenvironments/placeholdersprite.png" id="3_qobs4"]
+[ext_resource type="Texture2D" uid="uid://bo8j2tdp3mih2" path="res://Tileset_Templates/kenney_abstract-platformer/PNG/Backgrounds/set1_background.png" id="4_su48r"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_su48r"]
+size = Vector2(5016, 344)
+
+[node name="Slice2D" type="Node2D"]
+script = ExtResource("1_587wl")
+metadata/_edit_vertical_guides_ = [-12548.0]
+
+[node name="World" type="Node2D" parent="."]
+
+[node name="Player2D" type="CharacterBody2D" parent="."]
+script = ExtResource("2_jtocm")
+Gravity = 400.0
+
+[node name="Sprite2D" type="Sprite2D" parent="Player2D"]
+top_level = true
+texture = ExtResource("3_qobs4")
+
+[node name="Camera2D" type="Camera2D" parent="Player2D"]
+zoom = Vector2(0.1, 0.1)
+
+[node name="CollisionPolygon2D" type="CollisionPolygon2D" parent="Player2D"]
+polygon = PackedVector2Array(3, -192, -53, -169, -100, -98, -110, -12, -95, 70, -56, 134, -31, 156, 47, 158, 97, 117, 130, 48, 142, -19, 124, -94, 94, -153, 42, -188)
+
+[node name="UI" type="CanvasLayer" parent="."]
+
+[node name="Label" type="Label" parent="UI"]
+offset_right = 40.0
+offset_bottom = 23.0
+
+[node name="debugplatform" type="CollisionShape2D" parent="."]
+position = Vector2(97, 2328)
+shape = SubResource("RectangleShape2D_su48r")
+
+[node name="background" type="Sprite2D" parent="."]
+show_behind_parent = true
+z_index = -4
+position = Vector2(2081, -2337)
+scale = Vector2(19.3328, 20.2312)
+texture = ExtResource("4_su48r")
