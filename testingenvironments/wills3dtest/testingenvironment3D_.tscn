@@ -1,6 +1,7 @@
-[gd_scene load_steps=5 format=3 uid="uid://bw2rmcd7ai7u4"]
+[gd_scene load_steps=8 format=3 uid="uid://bw2rmcd7ai7u4"]
 
 [ext_resource type="PackedScene" uid="uid://bs72ogkvdd7d6" path="res://testingenvironments/wills3dtest/addons/proto_controller/proto_controller.tscn" id="1_lj7bs"]
+[ext_resource type="Texture2D" uid="uid://6emsvwyljccp" path="res://testingenvironments/wills3dtest/Textures/alien-panels-unity/alien-panels_albedo.png" id="1_lsxgi"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_6b0qx"]
 sky_horizon_color = Color(0.662243, 0.671743, 0.686743, 1)
@@ -15,20 +16,29 @@ sky = SubResource("Sky_lj7bs")
 tonemap_mode = 2
 glow_enabled = true
 
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_lsxgi"]
+albedo_texture = ExtResource("1_lsxgi")
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ps20t"]
+albedo_texture = ExtResource("1_lsxgi")
+
 [node name="Testingenvironment3d" type="Node3D"]
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="."]
 environment = SubResource("Environment_q2mpu")
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
-transform = Transform3D(-0.866023, -0.433016, 0.250001, 0, 0.499998, 0.866027, -0.500003, 0.749999, -0.43301, -2, 22, -2)
+transform = Transform3D(-0.866024, -0.433016, 0.250001, 0, 0.499998, 0.866026, -0.500003, 0.749999, -0.43301, -2, 17.8825, -2)
 shadow_enabled = true
 
 [node name="CSGCombiner3D" type="CSGCombiner3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.693008, 1.02096, 2.18617)
+material_override = SubResource("StandardMaterial3D_lsxgi")
 use_collision = true
 
 [node name="CSGBox3D" type="CSGBox3D" parent="CSGCombiner3D"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 2.25264, 0, 0, 0)
+material_override = SubResource("StandardMaterial3D_ps20t")
 use_collision = true
 size = Vector3(50, 1, 50)
 
@@ -65,5 +75,25 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12.5, 2, -7.5)
 use_collision = true
 size = Vector3(4, 1, 4)
 
+[node name="CSGBox3D6" type="CSGBox3D" parent="CSGCombiner3D"]
+transform = Transform3D(-1.93651e-08, -1, 0, 0.443022, -4.37114e-08, 0, 0, 0, 2.25264, -24.5879, 10.9494, 0)
+use_collision = true
+size = Vector3(50, 1, 50)
+
+[node name="CSGBox3D7" type="CSGBox3D" parent="CSGCombiner3D"]
+transform = Transform3D(-1.93651e-08, -1, 0, 0.443022, -4.37114e-08, 0, 0, 0, 2.25264, 24.436, 10.9494, 0)
+use_collision = true
+size = Vector3(50, 1, 50)
+
+[node name="CSGBox3D8" type="CSGBox3D" parent="CSGCombiner3D"]
+transform = Transform3D(4.91227e-16, 2.42598e-08, -1, 0.257095, -2.42598e-08, 1.17439e-22, -1.1238e-08, -0.555, -4.37114e-08, 0.101768, 10.7335, 56.1881)
+use_collision = true
+size = Vector3(88.2997, 1, 50)
+
+[node name="CSGBox3D9" type="CSGBox3D" parent="CSGCombiner3D"]
+transform = Transform3D(4.91227e-16, 2.42598e-08, -1, 0.257095, -2.42598e-08, 1.17439e-22, -1.1238e-08, -0.555, -4.37114e-08, 0.101768, 10.7335, -56.1691)
+use_collision = true
+size = Vector3(88.2997, 1, 50)
+
 [node name="ProtoController" parent="." instance=ExtResource("1_lj7bs")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.0534592, 1, 8)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.0534592, 1, 54.0019)

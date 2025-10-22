@@ -1,0 +1,22 @@
+[gd_scene load_steps=4 format=3 uid="uid://dbof47mhhcp4o"]
+
+[ext_resource type="Texture2D" uid="uid://6emsvwyljccp" path="res://testingenvironments/wills3dtest/Textures/alien-panels-unity/alien-panels_albedo.png" id="1_fmb5m"]
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_pohx0"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_p46ln"]
+albedo_texture = ExtResource("1_fmb5m")
+
+[node name="LevelConcept" type="Node3D"]
+
+[node name="Node3D" type="Node3D" parent="."]
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Node3D"]
+transform = Transform3D(12.7532, 0, 0, 0, 5.23306, 0, 0, 0, 6.499, 0, 0, 0)
+mesh = SubResource("PlaneMesh_pohx0")
+surface_material_override/0 = SubResource("StandardMaterial3D_p46ln")
+
+[node name="MeshInstance3D2" type="MeshInstance3D" parent="Node3D"]
+transform = Transform3D(12.7532, 0, 0, 0, -2.28744e-07, -6.499, 0, 5.23306, -2.8408e-07, 0.359133, 2.25343, -6.37184)
+mesh = SubResource("PlaneMesh_pohx0")
+surface_material_override/0 = SubResource("StandardMaterial3D_p46ln")
