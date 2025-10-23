@@ -68,33 +68,69 @@ public partial class SliceLevel2D : Node2D
 
 	GD.Print($"[Slice2D] PlayerStart2D(px) = {PlayerStart2D * Scale2D}");
 
+Vector2 start2D = PlayerStart2D;       // projected start from 3D (already V-flipped)
+if (GetCombinedAabb(out var aabb))
+{
+	// Clamp X into the level bounds; place Y slightly ABOVE the slice (smaller Y = higher up)
+	float clampedX = Mathf.Clamp(start2D.X, aabb.Position.X, aabb.Position.X + aabb.Size.X);
+	float aboveY   = aabb.Position.Y - 24f; // 24px above top of slice
+
+	start2D = new Vector2(clampedX, aboveY);
+}
+
+
+// Raycast straight down to find the first platform under start2D
+var space = GetWorld2D().DirectSpaceState;
+var from  = (start2D * Scale2D) + new Vector2(0, -2000);
+var to    = (start2D * Scale2D) + new Vector2(0,  2000);
+
+var query = PhysicsRayQueryParameters2D.Create(from, to);
+query.CollideWithAreas = false;
+query.CollideWithBodies = true;
+var hit = space.IntersectRay(query);
+
+// Half-height of the player collider if you use 12x24 (tweak if different)
+float halfHeight = 12f;
+
+Vector2 finalSpawn = start2D * Scale2D;
+if (hit.Count > 0 && hit.ContainsKey("position"))
+{
+	var pos = (Vector2)hit["position"];
+	// Place the player so feet sit on the surface (subtract half height)
+	finalSpawn = new Vector2(start2D.X * Scale2D, pos.Y - halfHeight);
+}
+
 
 		// Player
 		_player = GetNode<CharacterBody2D>("Player2D");
 _player.Position = PlayerStart2D * Scale2D;
 _startPos = _player.Position;
 
+// --- Decide a safe spawn point ---
+FixupPlayerHierarchy();
+
+
+
 var cam = _player.GetNode<Camera2D>("Camera2D");
 cam.PositionSmoothingEnabled = false;   // turn off while debugging
 cam.MakeCurrent();
 cam.Offset = Vector2.Zero;
-cam.Zoom = Vector2.One;                 // 1:1 scale
+cam.Zoom = new Vector2(0.1f, 0.1f);                 // 1:1 scale
 
-
+GetNode<Node2D>("World").ZIndex = 0;
+_player.ZIndex = 10;
 
 		// UI hint (optional)
 		var label = GetNodeOrNull<Label>("UI/Label");
 		if (label != null) label.Text = "LMB: Exit slice";
 	}
 
-	public override void _UnhandledInput(InputEvent e)
+public override void _UnhandledInput(InputEvent e)
 {
-	// Accept several inputs to exit:
 	bool wantExit =
-		Input.IsActionJustPressed("slice_exit") ||
-		Input.IsActionJustPressed("slice_aim") ||      // reuse LMB if you like
-		Input.IsActionJustPressed("ui_cancel") ||      // ESC
-		(e is InputEventMouseButton mb && mb.ButtonIndex == MouseButton.Left && mb.Pressed);
+		(InputMap.HasAction("slice_exit") && Input.IsActionJustPressed("slice_exit")) ||
+		Input.IsActionJustPressed("ui_cancel") ||     // ESC
+		Input.IsActionJustPressed("slice_aim");       // LMB (optional)
 
 	if (!wantExit) return;
 
@@ -102,10 +138,10 @@ cam.Zoom = Vector2.One;                 // 1:1 scale
 	GD.Print($"[Slice2D] Exit requested, delta2D={delta2D}");
 	EmitSignal(SignalName.SliceExit, delta2D);
 
-	// consume and close
 	GetViewport().SetInputAsHandled();
 	QueueFree();
 }
+
 
 	// -----------------------------
 	// Helpers (geometry & collision)
@@ -217,4 +253,91 @@ cam.Zoom = Vector2.One;                 // 1:1 scale
 			parent.AddChild(body);
 		}
 	}
+	
+	private void EnsureExitAction()
+{
+	if (!InputMap.HasAction("slice_exit"))
+	{
+		InputMap.AddAction("slice_exit");
+
+		var rmb = new InputEventMouseButton { ButtonIndex = MouseButton.Right };
+		InputMap.ActionAddEvent("slice_exit", rmb);
+
+		var eKey = new InputEventKey { Keycode = Key.E };
+		InputMap.ActionAddEvent("slice_exit", eKey);
+	}
+}
+
+// Combine AABB of all polygons (already in 2D coords, not scaled)
+private bool GetCombinedAabb(out Rect2 aabb)
+{
+	aabb = default;
+	if (Polygons2D == null || Polygons2D.Count == 0) return false;
+
+	bool first = true;
+	foreach (var poly in Polygons2D)
+	{
+		if (poly == null || poly.Count == 0) continue;
+		Vector2 min = new(float.MaxValue, float.MaxValue);
+		Vector2 max = new(float.MinValue, float.MinValue);
+		foreach (var p in poly)
+		{
+			min.X = MathF.Min(min.X, p.X);
+			min.Y = MathF.Min(min.Y, p.Y);
+			max.X = MathF.Max(max.X, p.X);
+			max.Y = MathF.Max(max.Y, p.Y);
+		}
+		var r = new Rect2(min, max - min);
+		aabb = first ? r : aabb.Merge(r);
+		first = false;
+	}
+	return !first;
+}
+
+private void FixupPlayerHierarchy()
+{
+	// 1) Normalize Player2D transform
+	_player.Scale = Vector2.One;
+	_player.Rotation = 0f;
+
+	// 2) Fix Sprite2D
+	var sprite = _player.GetNodeOrNull<Sprite2D>("Sprite2D");
+	if (sprite != null)
+	{
+		sprite.TopLevel = false;            // MUST follow parent
+		sprite.Centered = true;             // origin at texture center
+		sprite.Offset = Vector2.Zero;
+		sprite.Scale = Vector2.One;
+		sprite.Rotation = 0f;
+		sprite.ZIndex = 10;                 // draw above platforms
+	}
+
+	// 3) Fix CollisionShape2D (or CollisionPolygon2D) under Player2D
+	var col = _player.GetNodeOrNull<CollisionShape2D>("CollisionShape2D");
+	if (col != null)
+	{
+		col.TopLevel = false;
+		col.Position = Vector2.Zero;        // collider aligned with body origin
+		col.Rotation = 0f;
+		col.Scale = Vector2.One;
+		// Optional sanity: use a rectangle 12x24
+		if (col.Shape is RectangleShape2D rect)
+			rect.Size = new Vector2(12, 24);
+	}
+
+	// 4) Camera must be a CHILD of Player2D, not the root
+	var cam = _player.GetNodeOrNull<Camera2D>("Camera2D");
+	if (cam != null)
+	{
+		cam.TopLevel = false;
+		cam.PositionSmoothingEnabled = false;  // disable while debugging
+		cam.Offset = Vector2.Zero;
+		cam.Zoom = new Vector2(0.1f, 0.1f);
+		cam.Rotation = 0f;
+		cam.MakeCurrent();
+	}
+}
+
+
+
 }
