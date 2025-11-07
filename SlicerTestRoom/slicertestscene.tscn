@@ -238,10 +238,11 @@ surface_material_override/0 = SubResource("StandardMaterial3D_ssoar")
 shape = SubResource("ConcavePolygonShape3D_gqpm2")
 
 [node name="Floorpiece" type="MeshInstance3D" parent="."]
-transform = Transform3D(55.7541, 0, 0, 0, 0.209843, 0, 0, 0, 199.691, -2.72386, 3.14784, 0.596182)
+transform = Transform3D(54.8284, 0, 2.31938, 0, 3.90568, 0, -0.56844, 0, 223.714, -2.72386, 3.14784, 0.596182)
 mesh = SubResource("ArrayMesh_3e5jf")
 
 [node name="StaticBody3D" type="StaticBody3D" parent="Floorpiece"]
+transform = Transform3D(1.00754, 0, 3.72529e-09, 0, 1.00754, 0, 0, 0, 1.00754, 0, 0, 0)
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Floorpiece/StaticBody3D"]
 shape = SubResource("ConcavePolygonShape3D_2h024")
@@ -278,16 +279,18 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.542961, -36.4181, 0.437298
 skeleton = NodePath("")
 
 [node name="SliceManager" type="Node3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.502663, -36.8078, -0.0420797)
+transform = Transform3D(0.835381, 0, 0, 0, 0.835381, 0, 0, 0, 0.835381, -0.502663, -36.8078, -0.0420797)
 script = ExtResource("2_8afb0")
 PlayerPath = NodePath("../Player1")
 RoomRootPath = NodePath("../Room")
+TargetMeshes = Array[NodePath]([NodePath("../Floorpiece"), NodePath("../CSGBakedMeshInstance3D4"), NodePath("../CSGBakedMeshInstance3D5"), NodePath("../CSGBakedMeshInstance3D2"), NodePath("../CSGBakedMeshInstance3D3"), NodePath("../CSGBakedMeshInstance3D3"), NodePath("../CSGBakedMeshInstance3D")])
 CrosshairPath = NodePath("../HUD/CrosshairHud")
 GuideTexture = ExtResource("2_3e5jf")
 GuideHeight = 500.0
 MaxPreviewDistance = 400.0
 ShowCap = false
 CapMaterial = SubResource("StandardMaterial3D_tnkrv")
+SliceUnitsPerPixel = 0.3
 
 [node name="Player1" type="CharacterBody3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.542961, -28.3865, 0.437298)
@@ -295,7 +298,7 @@ script = ExtResource("1_dxv8b")
 CameraPath = NodePath("Camera3D")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Player1"]
-transform = Transform3D(3.86661, 0, 0, 0, 2.98639, 0.0381507, 0, -0.0264267, 4.31128, -0.177835, 37.3874, -0.101573)
+transform = Transform3D(3.79462, 0, 0, 0, 2.93138, 0.0365789, 0, -0.0259399, 4.13366, -0.177835, 37.3874, -0.101573)
 shape = SubResource("CapsuleShape3D_8afb0")
 debug_color = Color(0.173874, 0.552506, 0.878015, 0.42)
 

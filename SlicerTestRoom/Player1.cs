@@ -8,6 +8,11 @@ using System;
 /// </summary>
 public partial class Player1 : CharacterBody3D
 {
+	
+	//slice return variable
+	private bool _justReturnedFromSlice = false;
+
+	
 	// ===============================
 	// ==== CAMERA CONFIGURATION ====
 	// ===============================
@@ -39,6 +44,10 @@ public partial class Player1 : CharacterBody3D
 	[Export] public int MaxAirJumps = 0;            // Number of extra jumps allowed in air (0 = no double jump)
 	[Export] public float CoyoteTime = 0.12f;       // Small grace period after walking off a ledge
 	[Export] public float JumpBuffer = 0.12f;       // Buffer time for pressing jump just before landing
+
+// ----- Freeze Flag --------
+[Export] public bool ControlsEnabled = true;
+
 
 	// ===============================
 	// ===== INTERNAL VARIABLES =====
@@ -130,6 +139,24 @@ public partial class Player1 : CharacterBody3D
 
 	public override void _PhysicsProcess(double delta)
 	{
+		
+		if (!ControlsEnabled)
+{
+	// While frozen, don't integrate movement at all; keep a tiny
+	// downward bias only if you want them to re-stick to floor
+	// when unfreezing (optional). Usually full zero is safer.
+	// Velocity = Vector3.Zero;
+	return;
+}
+
+if (HasMeta("justReturnedFromSlice") && (bool)GetMeta("justReturnedFromSlice"))
+{
+	SetMeta("justReturnedFromSlice", false);
+	return; // skip this frame to prevent gravity tick
+}
+
+
+		
 		float dt = (float)delta;
 
 		// --- UPDATE TIMERS ---
@@ -225,4 +252,12 @@ public partial class Player1 : CharacterBody3D
 		// Move the player and handle collisions/ground detection automatically
 		MoveAndSlide();
 	}
+	
+	public void FreezeMotion(bool frozen)
+{
+	ControlsEnabled = !frozen;
+	// kill momentum immediately
+	Velocity = Vector3.Zero;
+}
+	
 }

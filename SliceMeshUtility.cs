@@ -6,23 +6,31 @@ public static class SliceMeshUtility
 {
 	public struct SliceResult
 	{
-		public ArrayMesh FrontMesh;   // (unused for now)
-		public ArrayMesh BackMesh;    // (unused for now)
-		public List<Vector3> SectionLoop;
+		public ArrayMesh FrontMesh;                 // (optional) kept if you use true mesh splitting
+		public ArrayMesh BackMesh;                  // (optional)
+		public List<Vector3> SectionLoop;           // unordered cross-section points (polygonal areas)
+		public List<Vector3[]> SectionSegments;     // line segments that lie exactly on the slice plane
 	}
 
+	/// <summary>
+	/// Very lightweight slicer that finds plane intersections:
+	/// - Adds edge intersection points into SectionLoop (later sorted into polygons by caller)
+	/// - Detects edges fully on the plane and adds them into SectionSegments (for thin geometry)
+	/// NOTE: Does not actually build FrontMesh/BackMesh (kept null here).
+	/// </summary>
 	public static SliceResult Slice(ArrayMesh mesh, Plane plane)
 	{
 		var result = new SliceResult
 		{
 			FrontMesh = null,
 			BackMesh = null,
-			SectionLoop = new List<Vector3>()
+			SectionLoop = new List<Vector3>(),
+			SectionSegments = new List<Vector3[]>()
 		};
 
 		if (mesh == null) return result;
 
-		// Find the first surface that is Triangles
+		// Find first triangle surface
 		int triSurface = -1;
 		int sc = mesh.GetSurfaceCount();
 		for (int s = 0; s < sc; s++)
@@ -33,25 +41,20 @@ public static class SliceMeshUtility
 				break;
 			}
 		}
-		if (triSurface == -1)
-		{
-			// No triangle surface to read — nothing to slice
-			return result;
-		}
+		if (triSurface == -1) return result;
 
-		// Read triangles via MeshDataTool
 		var mdt = new MeshDataTool();
-		var err = mdt.CreateFromSurface(mesh, triSurface);
-		if (err != Error.Ok) return result;
+		if (mdt.CreateFromSurface(mesh, triSurface) != Error.Ok) return result;
 
-		// Collect vertices
+		// Gather verts
 		var verts = new List<Vector3>(mdt.GetVertexCount());
 		for (int i = 0; i < mdt.GetVertexCount(); i++)
 			verts.Add(mdt.GetVertex(i));
 
-		// Build section loop by intersecting triangle edges with plane
-		var loopPts = new List<Vector3>();
+		// Epsilon for “coplanar”
+		const float eps = 1e-4f;
 
+		// Walk all faces, test edges
 		for (int f = 0; f < mdt.GetFaceCount(); f++)
 		{
 			int ia = mdt.GetFaceVertex(f, 0);
@@ -62,69 +65,63 @@ public static class SliceMeshUtility
 			Vector3 b = verts[ib];
 			Vector3 c = verts[ic];
 
-			AddIntersection(a, b, plane, loopPts);
-			AddIntersection(b, c, plane, loopPts);
-			AddIntersection(c, a, plane, loopPts);
+			AddEdge(a, b, plane, eps, result);
+			AddEdge(b, c, plane, eps, result);
+			AddEdge(c, a, plane, eps, result);
 		}
 
-		result.SectionLoop = loopPts;
 		return result;
 	}
 
-	private static void AddIntersection(Vector3 a, Vector3 b, Plane plane, List<Vector3> outList)
+	private static void AddEdge(Vector3 a, Vector3 b, Plane plane, float eps, SliceResult result)
 	{
 		float da = plane.DistanceTo(a);
 		float db = plane.DistanceTo(b);
-		// Strict sign change = segment crosses plane
-		if (da == 0f && db == 0f)
+
+		bool onA = MathF.Abs(da) <= eps;
+		bool onB = MathF.Abs(db) <= eps;
+
+		// Entire edge lies on plane → add a segment so we can build 2D collision from lines
+		if (onA && onB)
 		{
-			// Entire edge sits on plane — push both (cheap fallback)
-			outList.Add(a);
-			outList.Add(b);
+			result.SectionSegments.Add(new[] { a, b });
 			return;
 		}
+
+		// Proper crossing → add intersection point
 		if (da * db < 0.0f)
 		{
 			float t = da / (da - db);
 			Vector3 p = a + (b - a) * t;
-			outList.Add(p);
+			result.SectionLoop.Add(p);
 		}
 	}
 
-	/// <summary>
-	/// Intersects an arbitrary box (8 world-space corners) with a plane and returns intersection points.
-	/// </summary>
+	/// <summary>Optional helper if you need box-plane intersections elsewhere.</summary>
 	public static List<Vector3> IntersectAabbWithPlane(Vector3[] corners, Plane plane)
 	{
 		var hits = new List<Vector3>();
-
 		int[,] edges = {
-			{0,1},{1,3},{3,2},{2,0}, // bottom ring
-			{4,5},{5,7},{7,6},{6,4}, // top ring
-			{0,4},{1,5},{2,6},{3,7}  // verticals
+			{0,1},{1,3},{3,2},{2,0},
+			{4,5},{5,7},{7,6},{6,4},
+			{0,4},{1,5},{2,6},{3,7}
 		};
-
 		for (int i = 0; i < edges.GetLength(0); i++)
 		{
 			Vector3 a = corners[edges[i,0]];
 			Vector3 b = corners[edges[i,1]];
 			float da = plane.DistanceTo(a);
 			float db = plane.DistanceTo(b);
-
 			if (da == 0f && db == 0f)
 			{
-				// Edge lies on plane; add both ends
-				hits.Add(a);
-				hits.Add(b);
-				continue;
+				hits.Add(a); hits.Add(b);
 			}
-			if (da * db < 0f)
+			else if (da * db < 0f)
 			{
 				float t = da / (da - db);
 				hits.Add(a + (b - a) * t);
 			}
 		}
-
 		return hits;
 	}
 }
