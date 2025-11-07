@@ -3,12 +3,12 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-/// <summary>
+///file summary
 /// 2D slice world generated dynamically from SliceManager.
 /// Polygons2D are cross-section loops (in "slice UV" space where +Y is down).
 /// Segments2D are 2-point edges (for very thin intersections).
 /// Spawns the player analytically at the first floor under the projected X.
-/// </summary>
+
 public partial class SliceLevel2D : Node2D
 {
 	// ---------------- Signals ----------------
@@ -29,6 +29,11 @@ public partial class SliceLevel2D : Node2D
 	[Export] public bool DrawAabbDebug = true;
 	[Export] public bool DrawPolyOutlines = true;
 
+	//quick export to fix floor bounds because I will go crazy
+	//basically a hotfix for any level, just make it roughly the size of the width of all your platforms
+	[Export] public float FloorLiftPx = 20f;   // extra cushion above the floor
+
+
 	// ---------------- Data from SliceManager ----------------
 	public List<List<Vector2>> Polygons2D = new();   // loops in unscaled slice coords (CCW preferred). +Y is down
 	public List<Vector2[]> Segments2D = new();       // optional line segments in unscaled coords
@@ -40,6 +45,8 @@ public partial class SliceLevel2D : Node2D
 	private Vector2 _vel;
 	private Vector2 _startPosPx;        // store in *pixels* so delta2D = (posPx - startPx)/Scale2D
 	private bool _debugMode;
+
+	
 
 	public override void _Ready()
 	{
@@ -140,64 +147,56 @@ public partial class SliceLevel2D : Node2D
 	// ------------------------------------------------------------
 private void AnalyticSpawnAtFloor()
 {
-	// Player collider half-height in pixels; must match your CollisionShape2D (12x24)
-	const float halfHeightPx = 12f;
-	const float cushionPx = 2f;
+	const float halfHeightPx = 12f; // must match your player collider (12x24)
+	Vector2 startUV = PlayerStart2D; // unscaled
 
-	Vector2 startUV = PlayerStart2D; // unscaled slice coords (u, vDown)
-
-	// Bounds sanity (lets us clamp X)
 	if (!GetCombinedAabbUnscaled(out var aabbUV))
 	{
-		Vector2 pxRaw = startUV * Scale2D;
-		_player.Position = pxRaw;
-		_startPosPx = pxRaw;
-		GD.Print("[Slice2D] No polygons; using raw start position.");
+		Vector2 px = startUV * Scale2D;
+		_player.Position = px;
+		_startPosPx = px;
+		_player.Velocity = Vector2.Zero;
+		_vel = Vector2.Zero;
+		GD.Print("[Slice2D] No polygons; using raw start.");
 		return;
 	}
 
 	float clampedX = Mathf.Clamp(startUV.X, aabbUV.Position.X + 0.001f, aabbUV.End.X - 0.001f);
 
-	// Try to find a valid floor using span-aware query
-	if (TrySupportYFromPolys(clampedX, startUV.Y, out float floorY_UV))
+	if (TrySupportSpan(clampedX, startUV.Y, out float ceilYUV, out float floorYUV))
 	{
-		float spawnY_px = floorY_UV * Scale2D - halfHeightPx - cushionPx; // sit **on** that floor
-		Vector2 spawnPx = new Vector2(clampedX * Scale2D, spawnY_px);
+		// We want to sit firmly on the floor of the span that contains the player (or nearest span),
+		// then add a small positive lift so we don't interpenetrate after physics ticks.
+		float spawnY_px = floorYUV * Scale2D - halfHeightPx - FloorLiftPx;
 
+		// Guard: if the result would end up *above* the ceiling due to tiny spans, clamp just inside
+		float ceil_px = ceilYUV * Scale2D;
+		float minInside_px = ceil_px + 1f; // 1px inside the span
+		if (spawnY_px < minInside_px)
+			spawnY_px = minInside_px;
+
+		Vector2 spawnPx = new Vector2(clampedX * Scale2D, spawnY_px);
 		_player.Position = spawnPx;
 		_startPosPx = spawnPx;
 		_player.Velocity = Vector2.Zero;
 		_vel = Vector2.Zero;
 
-		GD.Print($"[Slice2D] Analytic spawn px={spawnPx} (floorY_UV={floorY_UV})");
+		GD.Print($"[Slice2D] Spawn px={spawnPx} (ceilUV={ceilYUV}, floorUV={floorYUV}, lift={FloorLiftPx}px)");
+		// Optional: one deferred re-snap to counter gravity on the very first physics frame
+		CallDeferred(nameof(PostSpawnResnap), clampedX, spawnY_px / Scale2D);
 		return;
 	}
 
-	// Fallback: shoot from the top of AABB in case start was outside all spans
-	float probeY = aabbUV.Position.Y - 1000f;
-	if (TrySupportYFromPolys(clampedX, probeY, out float floorFromTop_UV))
-	{
-		float spawnY_px = floorFromTop_UV * Scale2D - halfHeightPx - cushionPx;
-		Vector2 spawnPx = new Vector2(clampedX * Scale2D, spawnY_px);
-
-		_player.Position = spawnPx;
-		_startPosPx = spawnPx;
-		_player.Velocity = Vector2.Zero;
-		_vel = Vector2.Zero;
-
-		GD.Print($"[Slice2D] Fallback spawn px={spawnPx} (from top) floorY_UV={floorFromTop_UV}");
-		return;
-	}
-
-	// Last resort: raw start
-	Vector2 px = startUV * Scale2D;
-	_player.Position = px;
-	_startPosPx = px;
+	// Fallback: raw start
+	Vector2 raw = startUV * Scale2D;
+	_player.Position = raw;
+	_startPosPx = raw;
 	_player.Velocity = Vector2.Zero;
 	_vel = Vector2.Zero;
-
-	GD.Print("[Slice2D] No support found; using raw start position.");
+	GD.Print("[Slice2D] No support found; using raw start.");
 }
+
+
 
 
 	// Combine AABB of all loops in *unscaled* slice space
@@ -228,24 +227,23 @@ private void AnalyticSpawnAtFloor()
 
 	// Vertical support query in *unscaled* space.
 	// Returns the smallest Y >= y0UV where a vertical ray at xUV intersects any polygon edge.
-private bool TrySupportYFromPolys(float xUV, float y0UV, out float yHitUV)
+private bool TrySupportSpan(float xUV, float y0UV, out float ceilYUV, out float floorYUV)
 {
 	const float EPS = 1e-6f;
-	yHitUV = float.NaN;
+	ceilYUV = float.NaN;
+	floorYUV = float.NaN;
 
-	// Collect all intersections with polygon edges at this x
 	var hits = new List<float>(32);
 
 	foreach (var poly in Polygons2D)
 	{
 		if (poly == null || poly.Count < 2) continue;
-
 		for (int i = 0; i < poly.Count; i++)
 		{
 			Vector2 a = poly[i];
 			Vector2 b = poly[(i + 1) % poly.Count];
 
-			// Skip vertical edges (avoid division noise)
+			// skip vertical edges
 			float minX = MathF.Min(a.X, b.X), maxX = MathF.Max(a.X, b.X);
 			if (maxX - minX < EPS) continue;
 			if (xUV < minX - EPS || xUV > maxX + EPS) continue;
@@ -261,38 +259,38 @@ private bool TrySupportYFromPolys(float xUV, float y0UV, out float yHitUV)
 	if (hits.Count == 0)
 		return false;
 
-	hits.Sort(); // ascending: smaller Y = higher on screen (remember: +Y is down)
+	hits.Sort();
 
-	// If we have an odd number, drop the last to keep pairs well-formed
+	// keep pairs well-formed
 	if ((hits.Count & 1) == 1)
 		hits.RemoveAt(hits.Count - 1);
-
 	if (hits.Count == 0)
 		return false;
 
-	// 1) Inside any span? choose its floor
+	// 1) If inside a span, return that (ceil,floor)
 	for (int i = 0; i + 1 < hits.Count; i += 2)
 	{
 		float ceilY = hits[i];
 		float floorY = hits[i + 1];
-
-		// "Inside" means between ceil and floor in Y-down coordinates
 		if (y0UV >= ceilY - EPS && y0UV <= floorY + EPS)
 		{
-			yHitUV = floorY; // snap to the floor of the span you’re in
+			ceilYUV = ceilY;
+			floorYUV = floorY;
 			return true;
 		}
 	}
 
-	// 2) Above the first span → snap to that span's ceiling
+	// 2) Above the first span → snap to its ceiling (no floor selected)
 	if (y0UV < hits[0] - EPS)
 	{
-		yHitUV = hits[0];
+		ceilYUV = hits[0];
+		floorYUV = hits[1]; // the span just below; useful for thickness heuristics
 		return true;
 	}
 
 	// 3) Below all spans → snap to the last span's floor
-	yHitUV = hits[hits.Count - 1];
+	ceilYUV = hits[hits.Count - 2];
+	floorYUV = hits[hits.Count - 1];
 	return true;
 }
 
@@ -551,4 +549,21 @@ private bool TrySupportYFromPolys(float xUV, float y0UV, out float yHitUV)
 		_cam.Position = _player.Position;
 		GD.Print(_debugMode ? "[Slice2D] Free-cam enabled." : "[Slice2D] Free-cam disabled.");
 	}
+	
+	private void PostSpawnResnap(float xUV, float approxYUV)
+{
+	const float halfHeightPx = 12f;
+
+	if (!TrySupportSpan(xUV, approxYUV, out float ceilUV, out float floorUV))
+		return;
+
+	float desiredY_px = floorUV * Scale2D - halfHeightPx - FloorLiftPx;
+	float ceil_px = ceilUV * Scale2D;
+	if (desiredY_px < ceil_px + 1f)
+		desiredY_px = ceil_px + 1f;
+
+	_player.Position = new Vector2(_player.Position.X, desiredY_px);
+}
+
+	
 }

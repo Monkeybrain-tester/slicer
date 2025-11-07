@@ -303,7 +303,7 @@ private void EndAimAndSlice()
 			}
 
 			// if the mesh is too thin and only intersects as a line, SliceMeshUtility
-			// can expose SectionSegments (Vector3[2]) — if you added that, project them:
+			// can expose SectionSegments (Vector3[2]) — if you added that, project them
 			if (res.SectionSegments != null)
 			{
 				foreach (var seg in res.SectionSegments)
