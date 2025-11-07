@@ -2,9 +2,9 @@ using Godot;
 
 public partial class Player2D : CharacterBody2D
 {
-	[Export] public float MoveSpeed = 220f;
-	[Export] public float JumpSpeed = 360f;
-	[Export] public float Gravity = 980f;
+	[Export] public float MoveSpeed = 10;
+	[Export] public float JumpSpeed = 10;
+	[Export] public float Gravity = 1060;
 	
 	
 

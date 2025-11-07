@@ -191,9 +191,9 @@ public partial class Slice2DLevel : Node
 		[Signal] public delegate void OnUChangedEventHandler(float uValue); // Signal name => "OnUChanged"
 
 		private CharacterBody2D _body;
-		private float _speed = 180f;
-		private float _jumpVel = -260f;
-		private float _gravity = 720f;
+		private float _speed = 90;
+		private float _jumpVel = -50;
+		private float _gravity = 1000;
 
 		public override void _Ready()
 		{
