@@ -126,16 +126,24 @@ if ((TargetMeshes == null || TargetMeshes.Length == 0))
 	// Aim / Preview
 	// ------------------------------------------------------------
 	private void BeginAim()
-	{
-		if (_crosshair != null) _crosshair.Visible = true;
-		if (_guideDecal != null) _guideDecal.Visible = true;
-		UpdatePreview();
-	}
+{
+	if (_crosshair != null) _crosshair.Visible = true;
+	if (_guideDecal != null) _guideDecal.Visible = true;
+
+	// Hard-lock pitch to horizon while aiming
+	if (_player is Player1 p1) p1.LockPitchToHorizon();
+
+	UpdatePreview();
+}
+
 
 private void EndAimAndSlice()
 {
 	if (_crosshair != null) _crosshair.Visible = false;
 	if (_guideDecal != null) _guideDecal.Visible = false;
+
+	// Unlock vertical look now that we captured the slice plane
+	if (_player is Player1 p1) p1.UnlockPitch();
 
 	// --- Step 1: Capture aim origin & normal from camera or player ---
 	if (_cam != null)
@@ -226,105 +234,109 @@ private void EndAimAndSlice()
 	// ------------------------------------------------------------
 	// Slice execution
 	// ------------------------------------------------------------
-	private void ExecuteSlice()
+private void ExecuteSlice()
+{
+	// --- 1) Lock world plane & 2D projection basis ---
+	Vector3 n = _aimNormal;
+	if (ForceVertical) n = new Vector3(n.X, 0f, n.Z).Normalized();   // no tilt from camera pitch
+	_slicePlaneNormal = n;                                           // used on 3D return
+
+	// Camera forward (world)
+	Vector3 camFwd = (_cam != null
+		? -_cam.GlobalTransform.Basis.Z
+		: -_player.GlobalTransform.Basis.Z).Normalized();
+
+	// U = camera forward projected onto plane (so +X in 2D is "forward along slice")
+	Vector3 U = camFwd - n * camFwd.Dot(n);
+	if (U.LengthSquared() < 1e-6f) U = BuildPlaneTangent(n); else U = U.Normalized();
+
+	// V = n × U (up-in-plane). For vertical slices, lock to world up so jumps map to +Y.
+	Vector3 V = n.Cross(U).Normalized();
+	if (ForceVertical) V = Vector3.Up;
+
+	_basisU = U;
+	_basisV = V;
+
+	Plane worldPlane = new Plane(n, _aimOrigin.Dot(n));
+
+	// Three world points on the plane → transform into mesh local to define local plane
+	Vector3 wp0 = _aimOrigin;
+	Vector3 wp1 = _aimOrigin + U;
+	Vector3 wp2 = _aimOrigin + V;
+
+	// --- 2) Accumulators for 2D & (optional) 3D cap ---
+	var polygons2D  = new List<List<Vector2>>();
+	var segments2D  = new List<Vector2[]>();
+	var capWorldPts = new List<Vector3>();
+
+	// --- 3) Slice each target mesh ---
+	foreach (var path in TargetMeshes ?? Array.Empty<NodePath>())
 	{
-		var worldPlane = new Plane(_aimNormal, _aimOrigin.Dot(_aimNormal));
-		_slicePlaneNormal = _aimNormal.Normalized();
+		var mi = GetNodeOrNull<MeshInstance3D>(path);
+		if (mi == null || mi.Mesh == null) continue;
 
-		// For 2D world
-		var polygons2D = new List<List<Vector2>>();
-		var segments2D = new List<Vector2[]>();
+		var am = ConvertToArrayMesh(mi.Mesh);
+		if (am == null) continue;
 
-		// For 3D cap (optional)
-		var capPointsWorld = new List<Vector3>();
+		// world→local plane (3-point method)
+		var toLocal = mi.GlobalTransform.AffineInverse();
+		Vector3 lp0 = toLocal * wp0;
+		Vector3 lp1 = toLocal * wp1;
+		Vector3 lp2 = toLocal * wp2;
+		Vector3 lN  = (lp1 - lp0).Cross(lp2 - lp0).Normalized();
+		Plane  localPlane = new Plane(lN, lp0.Dot(lN));
 
-		// Prepare 3 distinct world points that lie on the plane to transform into local space
-		Vector3 t = BuildPlaneTangent(_aimNormal);
-		Vector3 b = _aimNormal.Cross(t);
-		Vector3 wp0 = _aimOrigin;
-		Vector3 wp1 = _aimOrigin + t;
-		Vector3 wp2 = _aimOrigin + b;
+		// Slice using your utility (has SectionSegments now)
+		var res = SliceMeshUtility.Slice(am, localPlane);
 
-		foreach (var path in TargetMeshes ?? Array.Empty<NodePath>())
+		// Keep front half in-node
+		if (res.FrontMesh != null)
+			mi.Mesh = res.FrontMesh;
+
+		// Optionally keep back half
+		if (KeepBackHalf && res.BackMesh != null)
 		{
-			var mi = GetNodeOrNull<MeshInstance3D>(path);
-			if (mi == null || mi.Mesh == null) continue;
+			var back = new MeshInstance3D { Mesh = res.BackMesh, GlobalTransform = mi.GlobalTransform };
+			mi.GetParent().AddChild(back);
+		}
 
-			var am = ConvertToArrayMesh(mi.Mesh);
-			if (am == null) continue;
-
-			// plane → mesh local (3-point method)
-			var toLocal = mi.GlobalTransform.AffineInverse();
-			Vector3 lp0 = toLocal * wp0;
-			Vector3 lp1 = toLocal * wp1;
-			Vector3 lp2 = toLocal * wp2;
-			Vector3 lN  = (lp1 - lp0).Cross(lp2 - lp0).Normalized();
-			Plane localPlane = new Plane(lN, lp0.Dot(lN));
-
-			// slice
-			var res = SliceMeshUtility.Slice(am, localPlane);
-
-			// keep front mesh in the original node
-			if (res.FrontMesh != null)
-				mi.Mesh = res.FrontMesh;
-
-			// optionally keep back half as a sibling
-			if (KeepBackHalf && res.BackMesh != null)
+		// ---- Segments → 2D (robust for holes/thin features) ----
+		if (res.SectionSegments != null && res.SectionSegments.Count > 0)
+		{
+			foreach (var (A, B) in res.SectionSegments)
 			{
-				var back = new MeshInstance3D
-				{
-					Mesh = res.BackMesh,
-					GlobalTransform = mi.GlobalTransform
-				};
-				mi.GetParent().AddChild(back);
-			}
-
-			// collect cross-section points (local→world)
-			if (res.SectionLoop != null && res.SectionLoop.Count > 0)
-			{
-				var loopWorld = new List<Vector3>(res.SectionLoop.Count);
-				foreach (var lp in res.SectionLoop) loopWorld.Add(mi.GlobalTransform * lp);
-
-				// add to 3D cap pool
-				capPointsWorld.AddRange(loopWorld);
-
-				// project to 2D slice space (U,V)
-				var loop2D = new List<Vector2>(loopWorld.Count);
-				foreach (var wp in loopWorld)
-				{
-					Vector3 r = wp - _aimOrigin;
-					float u = r.Dot(_basisU);
-					float v = r.Dot(_basisV);
-					loop2D.Add(new Vector2(u / SliceUnitsPerPixel, -v / SliceUnitsPerPixel)); // flip V for 2D up
-				}
-
-				// sort CCW around centroid
-				polygons2D.Add(SortLoopCCW(loop2D));
-			}
-
-			// if the mesh is too thin and only intersects as a line, SliceMeshUtility
-			// can expose SectionSegments (Vector3[2]) — if you added that, project them
-			if (res.SectionSegments != null)
-			{
-				foreach (var seg in res.SectionSegments)
-				{
-					Vector2 a = ProjectWorldTo2D(mi.GlobalTransform * seg[0]);
-					Vector2 c = ProjectWorldTo2D(mi.GlobalTransform * seg[1]);
-					segments2D.Add(new[] { a, c });
-				}
+				Vector2 a2 = ProjectWorldTo2D(mi.GlobalTransform * A);
+				Vector2 b2 = ProjectWorldTo2D(mi.GlobalTransform * B);
+				if ((b2 - a2).LengthSquared() > 0.0001f)
+					segments2D.Add(new[] { a2, b2 });
 			}
 		}
 
-		// optional visual cap in 3D
-		if (ShowCap && capPointsWorld.Count >= 3)
+		// ---- Optional polygon fill (pretty visuals; don’t rely on for collision) ----
+		if (res.SectionLoop != null && res.SectionLoop.Count >= 3)
 		{
-			var cap = BuildCap(worldPlane, capPointsWorld, CapMaterial);
-			if (cap != null) AddChild(cap);
-		}
+			var loopW = new List<Vector3>(res.SectionLoop.Count);
+			foreach (var lp in res.SectionLoop) loopW.Add(mi.GlobalTransform * lp);
+			capWorldPts.AddRange(loopW);
 
-		// hand off to 2D
-		LaunchSlice2D(polygons2D, segments2D);
+			var loop2D = new List<Vector2>(loopW.Count);
+			foreach (var wp in loopW)
+				loop2D.Add(ProjectWorldTo2D(wp)); // uses _aimOrigin/_basisU/_basisV/SliceUnitsPerPixel
+
+			polygons2D.Add(SortLoopCCW(loop2D));
+		}
 	}
+
+	// --- 4) Optional 3D visual cap (debug/style) ---
+	if (ShowCap && capWorldPts.Count >= 3)
+	{
+		var cap = BuildCap(worldPlane, capWorldPts, CapMaterial);
+		if (cap != null) AddChild(cap);
+	}
+
+	// --- 5) Launch 2D scene with both fills (polygons2D) and edges (segments2D) ---
+	LaunchSlice2D(polygons2D, segments2D);
+}
 
 	// ------------------------------------------------------------
 	// 2D scene launch / return

@@ -1,4 +1,4 @@
-[gd_scene load_steps=58 format=4 uid="uid://bxg071f16f7kb"]
+[gd_scene load_steps=58 format=4 uid="uid://c4x8cnh7gpesh"]
 
 [ext_resource type="Script" uid="uid://cdvglavl4o7yc" path="res://Levels/LevelRoot.cs" id="1_ersrp"]
 [ext_resource type="Script" uid="uid://dxn0hktjcsl30" path="res://SlicerTestRoom/Player1.cs" id="1_x6r5i"]
