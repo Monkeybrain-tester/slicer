@@ -501,8 +501,8 @@ animations = [{
 }]
 
 [sub_resource type="CapsuleShape2D" id="CapsuleShape2D_yvp0e"]
-radius = 91.5295
-height = 347.246
+radius = 86.4445
+height = 357.769
 
 [node name="Node2D" type="Node2D"]
 process_mode = 3
@@ -523,18 +523,19 @@ safe_margin = 7.838
 script = ExtResource("2_yvp0e")
 MoveSpeed = 500.0
 JumpVelocity = 600.0
+_gravity = 1500.0
 
 [node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="Player"]
-position = Vector2(20.3399, -36.8291)
+position = Vector2(22.8824, -44.7211)
 scale = Vector2(2.77978, 2.77978)
 sprite_frames = SubResource("SpriteFrames_hbkwt")
 animation = &"idle"
 autoplay = "idle"
-frame_progress = 0.264927
+frame_progress = 0.110584
 
 [node name="Camera2D" type="Camera2D" parent="Player"]
 position = Vector2(400, -150)
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Player"]
-position = Vector2(12.7124, -10.5226)
+position = Vector2(20.3399, -15.7839)
 shape = SubResource("CapsuleShape2D_yvp0e")
