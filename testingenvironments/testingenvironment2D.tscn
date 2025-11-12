@@ -1,4 +1,4 @@
-[gd_scene load_steps=31 format=4 uid="uid://c73whxqs1btet"]
+[gd_scene load_steps=40 format=4 uid="uid://c73whxqs1btet"]
 
 [ext_resource type="Texture2D" uid="uid://btaxtn2u3psfx" path="res://Tileset_Templates/Tileset_Templates/Tileset_2D Platformer.png" id="2_hbkwt"]
 [ext_resource type="Script" uid="uid://bjk0m1g3olv53" path="res://testingenvironments/Player.cs" id="2_yvp0e"]
@@ -26,6 +26,15 @@
 [ext_resource type="Texture2D" uid="uid://cecaiu5vskfa1" path="res://player_assets/idle_animation/21.png" id="24_mkkhc"]
 [ext_resource type="Texture2D" uid="uid://k2grchssvym6" path="res://player_assets/idle_animation/22.png" id="25_w0kn8"]
 [ext_resource type="Texture2D" uid="uid://yj82be152r02" path="res://player_assets/idle_animation/23.png" id="26_dskx2"]
+[ext_resource type="Texture2D" uid="uid://y7lcsbn7ue55" path="res://player_assets/running_sequence/00.png" id="27_1p25j"]
+[ext_resource type="Texture2D" uid="uid://dyjw88sigft76" path="res://player_assets/running_sequence/01.png" id="28_gfsge"]
+[ext_resource type="Texture2D" uid="uid://cgweph6p7r23a" path="res://player_assets/running_sequence/02.png" id="29_l35ff"]
+[ext_resource type="Texture2D" uid="uid://d3rlqmdjo06tx" path="res://player_assets/running_sequence/03.png" id="30_w7h2o"]
+[ext_resource type="Texture2D" uid="uid://b11h5idbf3uhe" path="res://player_assets/running_sequence/04.png" id="31_ixh6e"]
+[ext_resource type="Texture2D" uid="uid://b6l8t77c2lb7f" path="res://player_assets/running_sequence/05.png" id="32_6jk1r"]
+[ext_resource type="Texture2D" uid="uid://bxisjn78gsf4f" path="res://player_assets/running_sequence/06.png" id="33_ltrbm"]
+[ext_resource type="Texture2D" uid="uid://i76w73xgxr5b" path="res://player_assets/running_sequence/07.png" id="34_rse16"]
+[ext_resource type="Texture2D" uid="uid://bwcdohnn7xev5" path="res://player_assets/running_sequence/08.png" id="35_6cemo"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_yvp0e"]
 texture = ExtResource("2_hbkwt")
@@ -457,6 +466,38 @@ animations = [{
 "loop": true,
 "name": &"idle",
 "speed": 12.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("27_1p25j")
+}, {
+"duration": 1.0,
+"texture": ExtResource("28_gfsge")
+}, {
+"duration": 1.0,
+"texture": ExtResource("29_l35ff")
+}, {
+"duration": 1.0,
+"texture": ExtResource("30_w7h2o")
+}, {
+"duration": 1.0,
+"texture": ExtResource("31_ixh6e")
+}, {
+"duration": 1.0,
+"texture": ExtResource("32_6jk1r")
+}, {
+"duration": 1.0,
+"texture": ExtResource("33_ltrbm")
+}, {
+"duration": 1.0,
+"texture": ExtResource("34_rse16")
+}, {
+"duration": 1.0,
+"texture": ExtResource("35_6cemo")
+}],
+"loop": true,
+"name": &"running",
+"speed": 12.0
 }]
 
 [sub_resource type="CapsuleShape2D" id="CapsuleShape2D_yvp0e"]
@@ -489,7 +530,7 @@ scale = Vector2(2.77978, 2.77978)
 sprite_frames = SubResource("SpriteFrames_hbkwt")
 animation = &"idle"
 autoplay = "idle"
-frame_progress = 0.780249
+frame_progress = 0.264927
 
 [node name="Camera2D" type="Camera2D" parent="Player"]
 position = Vector2(400, -150)
