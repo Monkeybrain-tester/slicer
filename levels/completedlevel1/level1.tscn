@@ -430,7 +430,7 @@ omni_attenuation = 2.065
 omni_shadow_mode = 0
 
 [node name="Brightarealight3" type="MeshInstance3D" parent="."]
-transform = Transform3D(-1.10604, 0, 0, 0, 1, 0, 0, 0, 1, 19.3941, 10.6369, -0.903446)
+transform = Transform3D(-1.10604, 0, 0, 0, 1, 0, 0, 0, 1, 19.6113, 10.7852, -0.662092)
 mesh = SubResource("ArrayMesh_jk0ww")
 surface_material_override/0 = SubResource("StandardMaterial3D_qybk6")
 
