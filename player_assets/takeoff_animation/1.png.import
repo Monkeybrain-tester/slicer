@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bf6nbkta4wkm3"
-path="res://.godot/imported/09.png-e9a2260213a90a1aa4fb4c68298eb48c.ctex"
+uid="uid://4keq8qbcb3mf"
+path="res://.godot/imported/1.png-f2d4cfae6c1ad8faad59f9bbf295bf10.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://player_assets/running_sequence/09.png"
-dest_files=["res://.godot/imported/09.png-e9a2260213a90a1aa4fb4c68298eb48c.ctex"]
+source_file="res://player_assets/takeoff_animation/1.png"
+dest_files=["res://.godot/imported/1.png-f2d4cfae6c1ad8faad59f9bbf295bf10.ctex"]
 
 [params]
 

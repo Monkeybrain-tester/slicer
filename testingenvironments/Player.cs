@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Threading.Tasks;
 using Godot;
 
 
@@ -17,7 +18,7 @@ public partial class Player : CharacterBody2D
 	private Timer _jumpBufferTimer;
 
 	// Possible States
-	enum State { Idle, Run, Takeoff, Jump, Skid, Land }
+	enum State { Idle, Run, Jump, Skid, Land }
 	private State current_state;
 
     public override void _Ready()
@@ -85,7 +86,13 @@ public partial class Player : CharacterBody2D
 
 		// Player slides back to 0 velocity
 		else
-			Velocity = new Vector2(Mathf.MoveToward(Velocity.X, 0, Friction * (float)delta), Velocity.Y);
+        {
+            if(!IsOnFloor())
+				Velocity = new Vector2(Mathf.MoveToward(Velocity.X, 0, Friction * (float)delta * 2), Velocity.Y);
+			else
+				Velocity = new Vector2(Mathf.MoveToward(Velocity.X, 0, Friction * (float)delta), Velocity.Y);
+        }
+			
 	}
 	
 	// Jump state
@@ -110,11 +117,12 @@ public partial class Player : CharacterBody2D
     }
 
 	// Handles animation based on state
-	public void player_animation()
+	public async Task player_animation()
     {
 		if (current_state == State.Idle)
 			_animatedSprite2D.Play("idle");
 		else if (current_state == State.Run)
 			_animatedSprite2D.Play("running");
     }
+
 }

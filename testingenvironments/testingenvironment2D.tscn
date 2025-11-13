@@ -1,4 +1,4 @@
-[gd_scene load_steps=40 format=4 uid="uid://c73whxqs1btet"]
+[gd_scene load_steps=42 format=4 uid="uid://c73whxqs1btet"]
 
 [ext_resource type="Texture2D" uid="uid://btaxtn2u3psfx" path="res://Tileset_Templates/Tileset_Templates/Tileset_2D Platformer.png" id="2_hbkwt"]
 [ext_resource type="Script" uid="uid://bjk0m1g3olv53" path="res://testingenvironments/Player.cs" id="2_yvp0e"]
@@ -26,15 +26,17 @@
 [ext_resource type="Texture2D" uid="uid://cecaiu5vskfa1" path="res://player_assets/idle_animation/21.png" id="24_mkkhc"]
 [ext_resource type="Texture2D" uid="uid://k2grchssvym6" path="res://player_assets/idle_animation/22.png" id="25_w0kn8"]
 [ext_resource type="Texture2D" uid="uid://yj82be152r02" path="res://player_assets/idle_animation/23.png" id="26_dskx2"]
-[ext_resource type="Texture2D" uid="uid://y7lcsbn7ue55" path="res://player_assets/running_sequence/00.png" id="27_1p25j"]
-[ext_resource type="Texture2D" uid="uid://dyjw88sigft76" path="res://player_assets/running_sequence/01.png" id="28_gfsge"]
-[ext_resource type="Texture2D" uid="uid://cgweph6p7r23a" path="res://player_assets/running_sequence/02.png" id="29_l35ff"]
-[ext_resource type="Texture2D" uid="uid://d3rlqmdjo06tx" path="res://player_assets/running_sequence/03.png" id="30_w7h2o"]
-[ext_resource type="Texture2D" uid="uid://b11h5idbf3uhe" path="res://player_assets/running_sequence/04.png" id="31_ixh6e"]
-[ext_resource type="Texture2D" uid="uid://b6l8t77c2lb7f" path="res://player_assets/running_sequence/05.png" id="32_6jk1r"]
-[ext_resource type="Texture2D" uid="uid://bxisjn78gsf4f" path="res://player_assets/running_sequence/06.png" id="33_ltrbm"]
-[ext_resource type="Texture2D" uid="uid://i76w73xgxr5b" path="res://player_assets/running_sequence/07.png" id="34_rse16"]
-[ext_resource type="Texture2D" uid="uid://bwcdohnn7xev5" path="res://player_assets/running_sequence/08.png" id="35_6cemo"]
+[ext_resource type="Texture2D" uid="uid://y7lcsbn7ue55" path="res://player_assets/running_animation/00.png" id="27_1p25j"]
+[ext_resource type="Texture2D" uid="uid://dyjw88sigft76" path="res://player_assets/running_animation/01.png" id="28_gfsge"]
+[ext_resource type="Texture2D" uid="uid://cgweph6p7r23a" path="res://player_assets/running_animation/02.png" id="29_l35ff"]
+[ext_resource type="Texture2D" uid="uid://d3rlqmdjo06tx" path="res://player_assets/running_animation/03.png" id="30_w7h2o"]
+[ext_resource type="Texture2D" uid="uid://b11h5idbf3uhe" path="res://player_assets/running_animation/04.png" id="31_ixh6e"]
+[ext_resource type="Texture2D" uid="uid://b6l8t77c2lb7f" path="res://player_assets/running_animation/05.png" id="32_6jk1r"]
+[ext_resource type="Texture2D" uid="uid://bxisjn78gsf4f" path="res://player_assets/running_animation/06.png" id="33_ltrbm"]
+[ext_resource type="Texture2D" uid="uid://cpft5wu238giy" path="res://player_assets/running_animation/07.png" id="34_rse16"]
+[ext_resource type="Texture2D" uid="uid://bwcdohnn7xev5" path="res://player_assets/running_animation/08.png" id="35_6cemo"]
+[ext_resource type="Texture2D" uid="uid://4keq8qbcb3mf" path="res://player_assets/takeoff_animation/1.png" id="36_l35ff"]
+[ext_resource type="Texture2D" uid="uid://0hwqy85nmv2b" path="res://player_assets/takeoff_animation/2.png" id="37_w7h2o"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_yvp0e"]
 texture = ExtResource("2_hbkwt")
@@ -498,6 +500,17 @@ animations = [{
 "loop": true,
 "name": &"running",
 "speed": 12.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("36_l35ff")
+}, {
+"duration": 1.0,
+"texture": ExtResource("37_w7h2o")
+}],
+"loop": false,
+"name": &"takeoff",
+"speed": 12.0
 }]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_1p25j"]
@@ -524,25 +537,24 @@ script = ExtResource("2_yvp0e")
 MoveSpeed = 700.0
 JumpVelocity = 1000.0
 _gravity = 2500.0
-Acceleration = 2000.0
+Acceleration = 2500.0
 LowJumpMultiplier = 0.3
-Friction = 3500.0
+Friction = 4000.0
 
 [node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="Player"]
 position = Vector2(0, -207.254)
 scale = Vector2(2.77978, 2.77978)
 sprite_frames = SubResource("SpriteFrames_hbkwt")
-animation = &"idle"
+animation = &"running"
 autoplay = "idle"
-frame_progress = 0.110584
 
 [node name="Camera2D" type="Camera2D" parent="Player"]
-position = Vector2(400, -150)
-zoom = Vector2(0.75, 0.75)
+position = Vector2(0, -400)
+zoom = Vector2(0.85, 0.85)
+position_smoothing_enabled = true
 
 [node name="PlayerCollision" type="CollisionShape2D" parent="Player"]
 position = Vector2(0, -170.992)
-scale = Vector2(1, 1)
 shape = SubResource("RectangleShape2D_1p25j")
 
 [node name="CoyoteTimer" type="Timer" parent="Player"]
@@ -550,5 +562,5 @@ wait_time = 0.1
 one_shot = true
 
 [node name="JumpBufferTimer" type="Timer" parent="Player"]
-wait_time = 0.2
+wait_time = 0.1
 one_shot = true
