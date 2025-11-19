@@ -20,7 +20,7 @@ public partial class Player : CharacterBody2D
 	private AnimationNodeStateMachinePlayback _animationPlayback;
 
 	// Possible States
-	enum State { Idle, Running, Jump, Falling }
+	enum State { Idle, Running, Jump, Falling, Pushing}
 	private State current_state;
 
     public override void _Ready()
@@ -84,8 +84,10 @@ public partial class Player : CharacterBody2D
 		if (direction != 0.0f)
         {
 			Velocity = new Vector2(Mathf.MoveToward(Velocity.X, target_speed, Acceleration * (float)delta), Velocity.Y);
-			if(IsOnFloor())
+			if(IsOnFloor() && !IsOnWall())
 				current_state = State.Running;
+			else if(IsOnFloor())
+				current_state = State.Pushing;
 
 			// Flips sprite when moving opposite direction
 			if (direction > 0.0f) _animatedSprite2D.FlipH = false;
@@ -135,8 +137,8 @@ public partial class Player : CharacterBody2D
 			_animationPlayback.Travel("falling");
 		else if (current_state == State.Running)
 			_animationPlayback.Travel("running");
-		
-
+		else if (current_state == State.Pushing)
+			_animationPlayback.Travel("push");
     }
 
 }
