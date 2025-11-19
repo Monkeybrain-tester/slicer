@@ -16,9 +16,11 @@ public partial class Player : CharacterBody2D
 	private AnimatedSprite2D _animatedSprite2D;
 	private Timer _coyoteTimer;
 	private Timer _jumpBufferTimer;
+	private AnimationTree _animationTree;
+	private AnimationNodeStateMachinePlayback _animationPlayback;
 
 	// Possible States
-	enum State { Idle, Run, Jump, Skid, Land }
+	enum State { Idle, Running, Jump, Falling }
 	private State current_state;
 
     public override void _Ready()
@@ -27,15 +29,17 @@ public partial class Player : CharacterBody2D
 		_animatedSprite2D = GetNode<AnimatedSprite2D>("AnimatedSprite2D");
 		_coyoteTimer = GetNode<Timer>("CoyoteTimer");
 		_jumpBufferTimer = GetNode<Timer>("JumpBufferTimer");
+		_animationTree = GetNode<AnimationTree>("AnimationTree");
+		_animationPlayback = (AnimationNodeStateMachinePlayback)_animationTree.Get("parameters/playback");
 		
 		// Sets initial state to Idle
-		current_state = State.Idle;
+		_animationPlayback.Get("idle");
 	}
 
 	public override void _PhysicsProcess(double delta)
 	{
 		// Detects state
-		player_falling(delta);
+		player_in_air(delta);
 		player_idle(delta);
 		player_run(delta);
 		player_jump(delta);
@@ -51,11 +55,14 @@ public partial class Player : CharacterBody2D
 	}
 
 	// Falling state
-	public void player_falling(double delta)
+	public void player_in_air(double delta)
 	{
 		if (!IsOnFloor())
 		{
-			current_state = State.Jump;
+			if(Velocity.Y >= 0)
+				current_state = State.Falling;
+			else
+				current_state = State.Jump;
 			Velocity += new Vector2(0, _gravity * (float)delta);
 		}
 	}
@@ -77,7 +84,8 @@ public partial class Player : CharacterBody2D
 		if (direction != 0.0f)
         {
 			Velocity = new Vector2(Mathf.MoveToward(Velocity.X, target_speed, Acceleration * (float)delta), Velocity.Y);
-			current_state = State.Run;
+			if(IsOnFloor())
+				current_state = State.Running;
 
 			// Flips sprite when moving opposite direction
 			if (direction > 0.0f) _animatedSprite2D.FlipH = false;
@@ -119,10 +127,16 @@ public partial class Player : CharacterBody2D
 	// Handles animation based on state
 	public async Task player_animation()
     {
-		if (current_state == State.Idle)
-			_animatedSprite2D.Play("idle");
-		else if (current_state == State.Run)
-			_animatedSprite2D.Play("running");
+		if (current_state == State.Idle) 
+			_animationPlayback.Travel("idle");
+		else if (current_state == State.Jump)
+			_animationPlayback.Travel("jump");
+		else if (current_state == State.Falling)
+			_animationPlayback.Travel("falling");
+		else if (current_state == State.Running)
+			_animationPlayback.Travel("running");
+		
+
     }
 
 }
