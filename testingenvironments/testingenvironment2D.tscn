@@ -1,4 +1,4 @@
-[gd_scene load_steps=113 format=4 uid="uid://c73whxqs1btet"]
+[gd_scene load_steps=117 format=4 uid="uid://c73whxqs1btet"]
 
 [ext_resource type="Texture2D" uid="uid://btaxtn2u3psfx" path="res://Tileset_Templates/Tileset_Templates/Tileset_2D Platformer.png" id="2_hbkwt"]
 [ext_resource type="Script" uid="uid://bjk0m1g3olv53" path="res://testingenvironments/Player.cs" id="2_yvp0e"]
@@ -866,6 +866,36 @@ tracks/1/keys = {
 "values": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23]
 }
 
+[sub_resource type="Animation" id="Animation_c5ysx"]
+resource_name = "push"
+length = 2.00001
+loop_mode = 1
+step = 0.0833333
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("AnimatedSprite2D:animation")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 1,
+"values": [&"push"]
+}
+tracks/1/type = "value"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath("AnimatedSprite2D:frame")
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0, 0.0839713, 0.167015, 0.250362, 0.333333, 0.416667, 0.5, 0.583333, 0.666667, 0.75, 0.833333, 0.916667, 1, 1.08333, 1.16667, 1.25, 1.33333, 1.41667, 1.5, 1.58333, 1.66667, 1.75, 1.83333, 1.91667),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1),
+"update": 1,
+"values": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23]
+}
+
 [sub_resource type="Animation" id="Animation_6cemo"]
 resource_name = "running"
 length = 0.750008
@@ -954,10 +984,9 @@ tracks/1/keys = {
 "values": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23]
 }
 
-[sub_resource type="Animation" id="Animation_c5ysx"]
-resource_name = "push"
-length = 2.00001
-loop_mode = 1
+[sub_resource type="Animation" id="Animation_r3ktn"]
+resource_name = "stop_pushing"
+length = 0.0833416
 step = 0.0833333
 tracks/0/type = "value"
 tracks/0/imported = false
@@ -969,7 +998,7 @@ tracks/0/keys = {
 "times": PackedFloat32Array(0),
 "transitions": PackedFloat32Array(1),
 "update": 1,
-"values": [&"push"]
+"values": [&"takeoff"]
 }
 tracks/1/type = "value"
 tracks/1/imported = false
@@ -978,10 +1007,10 @@ tracks/1/path = NodePath("AnimatedSprite2D:frame")
 tracks/1/interp = 1
 tracks/1/loop_wrap = true
 tracks/1/keys = {
-"times": PackedFloat32Array(0, 0.0839713, 0.167015, 0.250362, 0.333333, 0.416667, 0.5, 0.583333, 0.666667, 0.75, 0.833333, 0.916667, 1, 1.08333, 1.16667, 1.25, 1.33333, 1.41667, 1.5, 1.58333, 1.66667, 1.75, 1.83333, 1.91667),
-"transitions": PackedFloat32Array(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1),
+"times": PackedFloat32Array(0, 0.167015, 0.250362, 0.333333, 0.416667, 0.5, 0.583333, 0.666667, 0.75, 0.833333, 0.916667, 1, 1.08333, 1.16667, 1.25, 1.33333, 1.41667, 1.5, 1.58333, 1.66667, 1.75, 1.83333, 1.91667),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1),
 "update": 1,
-"values": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23]
+"values": [0, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23]
 }
 
 [sub_resource type="AnimationLibrary" id="AnimationLibrary_rse16"]
@@ -996,6 +1025,7 @@ _data = {
 &"push": SubResource("Animation_c5ysx"),
 &"running": SubResource("Animation_6cemo"),
 &"skid": SubResource("Animation_ludg5"),
+&"stop_pushing": SubResource("Animation_r3ktn"),
 &"takeoff": SubResource("Animation_ggjus")
 }
 
@@ -1022,6 +1052,9 @@ animation = &"running"
 
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_jsr5u"]
 animation = &"skid"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_3jf0j"]
+animation = &"stop_pushing"
 
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_mkkhc"]
 animation = &"takeoff"
@@ -1074,6 +1107,11 @@ switch_mode = 2
 
 [sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_r3ktn"]
 
+[sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_3e6ck"]
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_g45j2"]
+switch_mode = 2
+
 [sub_resource type="AnimationNodeStateMachine" id="AnimationNodeStateMachine_ltrbm"]
 states/falling/node = SubResource("AnimationNodeAnimation_ltrbm")
 states/falling/position = Vector2(665, 199)
@@ -1086,14 +1124,16 @@ states/jump/position = Vector2(464, 77)
 states/landing/node = SubResource("AnimationNodeAnimation_f2h6o")
 states/landing/position = Vector2(590, 286)
 states/push/node = SubResource("AnimationNodeAnimation_a8lfm")
-states/push/position = Vector2(464, 359)
+states/push/position = Vector2(455, 381)
 states/running/node = SubResource("AnimationNodeAnimation_bbmhn")
 states/running/position = Vector2(200, 264)
 states/skid/node = SubResource("AnimationNodeAnimation_jsr5u")
 states/skid/position = Vector2(175, 187.847)
+states/stop_pushing/node = SubResource("AnimationNodeAnimation_3jf0j")
+states/stop_pushing/position = Vector2(573, 351)
 states/takeoff/node = SubResource("AnimationNodeAnimation_mkkhc")
 states/takeoff/position = Vector2(272, 374)
-transitions = ["Start", "idle", SubResource("AnimationNodeStateMachineTransition_w0kn8"), "idle", "takeoff", SubResource("AnimationNodeStateMachineTransition_dskx2"), "takeoff", "running", SubResource("AnimationNodeStateMachineTransition_ludg5"), "falling", "landing", SubResource("AnimationNodeStateMachineTransition_u8p8n"), "landing", "takeoff", SubResource("AnimationNodeStateMachineTransition_d3qiv"), "landing", "idle", SubResource("AnimationNodeStateMachineTransition_ngkyo"), "jump", "falling_init", SubResource("AnimationNodeStateMachineTransition_83dn1"), "falling_init", "falling", SubResource("AnimationNodeStateMachineTransition_frw8n"), "landing", "running", SubResource("AnimationNodeStateMachineTransition_rse16"), "running", "skid", SubResource("AnimationNodeStateMachineTransition_ytnpj"), "skid", "idle", SubResource("AnimationNodeStateMachineTransition_0bfwg"), "idle", "jump", SubResource("AnimationNodeStateMachineTransition_6cemo"), "skid", "jump", SubResource("AnimationNodeStateMachineTransition_ggjus"), "skid", "falling_init", SubResource("AnimationNodeStateMachineTransition_f2h6o"), "idle", "falling_init", SubResource("AnimationNodeStateMachineTransition_bbmhn"), "running", "falling_init", SubResource("AnimationNodeStateMachineTransition_mkkhc"), "takeoff", "falling_init", SubResource("AnimationNodeStateMachineTransition_jsr5u"), "takeoff", "push", SubResource("AnimationNodeStateMachineTransition_vmc8r"), "running", "push", SubResource("AnimationNodeStateMachineTransition_r3ktn")]
+transitions = ["Start", "idle", SubResource("AnimationNodeStateMachineTransition_w0kn8"), "idle", "takeoff", SubResource("AnimationNodeStateMachineTransition_dskx2"), "takeoff", "running", SubResource("AnimationNodeStateMachineTransition_ludg5"), "falling", "landing", SubResource("AnimationNodeStateMachineTransition_u8p8n"), "landing", "takeoff", SubResource("AnimationNodeStateMachineTransition_d3qiv"), "landing", "idle", SubResource("AnimationNodeStateMachineTransition_ngkyo"), "jump", "falling_init", SubResource("AnimationNodeStateMachineTransition_83dn1"), "falling_init", "falling", SubResource("AnimationNodeStateMachineTransition_frw8n"), "landing", "running", SubResource("AnimationNodeStateMachineTransition_rse16"), "running", "skid", SubResource("AnimationNodeStateMachineTransition_ytnpj"), "skid", "idle", SubResource("AnimationNodeStateMachineTransition_0bfwg"), "idle", "jump", SubResource("AnimationNodeStateMachineTransition_6cemo"), "skid", "jump", SubResource("AnimationNodeStateMachineTransition_ggjus"), "skid", "falling_init", SubResource("AnimationNodeStateMachineTransition_f2h6o"), "idle", "falling_init", SubResource("AnimationNodeStateMachineTransition_bbmhn"), "running", "falling_init", SubResource("AnimationNodeStateMachineTransition_mkkhc"), "takeoff", "falling_init", SubResource("AnimationNodeStateMachineTransition_jsr5u"), "takeoff", "push", SubResource("AnimationNodeStateMachineTransition_vmc8r"), "running", "push", SubResource("AnimationNodeStateMachineTransition_r3ktn"), "push", "stop_pushing", SubResource("AnimationNodeStateMachineTransition_3e6ck"), "stop_pushing", "idle", SubResource("AnimationNodeStateMachineTransition_g45j2")]
 graph_offset = Vector2(-91, 25.8474)
 
 [node name="Node2D" type="Node2D"]
@@ -1125,8 +1165,9 @@ Friction = 4000.0
 position = Vector2(0, -209.885)
 scale = Vector2(2.77978, 2.77978)
 sprite_frames = SubResource("SpriteFrames_hbkwt")
-animation = &"falling"
+animation = &"takeoff"
 autoplay = "idle"
+frame = 1
 
 [node name="Camera2D" type="Camera2D" parent="Player"]
 position = Vector2(0, -400)
@@ -1135,7 +1176,6 @@ position_smoothing_enabled = true
 
 [node name="PlayerCollision" type="CollisionShape2D" parent="Player"]
 position = Vector2(0, -170.992)
-scale = Vector2(1, 1)
 shape = SubResource("RectangleShape2D_1p25j")
 
 [node name="CoyoteTimer" type="Timer" parent="Player"]
