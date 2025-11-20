@@ -10,8 +10,8 @@ config_version=5
 
 [application]
 
-config/name="Slicer"
-run/main_scene="uid://c73whxqs1btet"
+config/name="slicer"
+run/main_scene="uid://bxg071f16f7kb"
 config/features=PackedStringArray("4.4", "C#", "Forward Plus")
 config/icon="res://icon.svg"
 

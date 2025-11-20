@@ -1,0 +1,12 @@
+[gd_resource type="StandardMaterial3D" load_steps=2 format=3 uid="uid://cb4tpirh2ecfs"]
+
+[sub_resource type="ImageTexture" id="ImageTexture_mxm2j"]
+resource_local_to_scene = true
+
+[resource]
+albedo_color = Color(0, 0.535335, 0.858965, 1)
+albedo_texture = SubResource("ImageTexture_mxm2j")
+metallic_specular = 0.53
+emission_enabled = true
+emission = Color(0, 0, 0.584314, 1)
+emission_energy_multiplier = 2.0
