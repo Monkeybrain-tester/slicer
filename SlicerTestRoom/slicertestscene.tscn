@@ -338,3 +338,4 @@ anchors_preset = 0
 offset_right = 40.0
 offset_bottom = 40.0
 script = ExtResource("3_ssoar")
+metadata/_edit_use_anchors_ = true

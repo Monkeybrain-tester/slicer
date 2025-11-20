@@ -59,7 +59,12 @@ public partial class Player1 : CharacterBody3D
 	private float _gravity;                          // Pulled from project settings
 	private float _coyoteTimer;                      // Countdown for coyote time grace window
 	private float _jumpBufferTimer;                  // Countdown for jump buffer input window
-	private int _airJumpsLeft;                       // How many mid-air jumps remain
+	private int _airJumpsLeft;     
+
+	private bool _pitchLocked = false;
+	private float _lockedPitchDeg = 0f;
+	private float _savedPitchDeg = 0f;
+
 
 	// ===============================
 	// ===== INITIALIZATION =========
@@ -108,24 +113,28 @@ public partial class Player1 : CharacterBody3D
 	public override void _Input(InputEvent e)
 	{
 		// Handle mouse movement for rotation
-		if (e is InputEventMouseMotion m && Input.MouseMode == Input.MouseModeEnum.Captured)
-		{
-			// --- YAW (Horizontal Look) ---
-			// Rotate the player body around Y axis
-			// Negative X for standard FPS direction (mouse right = turn right)
-			_yawDeg += -m.Relative.X * MouseSensitivity;
-			RotationDegrees = new Vector3(0f, _yawDeg, 0f);
+if (e is InputEventMouseMotion m && Input.MouseMode == Input.MouseModeEnum.Captured)
+{
+	// Yaw always allowed
+	_yawDeg += -m.Relative.X * MouseSensitivity;
+	RotationDegrees = new Vector3(0f, _yawDeg, 0f);
 
-			// --- PITCH (Vertical Look) ---
-			// Mouse up/down moves camera pitch.
-			// Convention here: +X = look down, -X = look up.
-			float dy = m.Relative.Y * MouseSensitivity * (InvertY ? 1f : -1f);
-			_pitchDeg = Mathf.Clamp(_pitchDeg + dy, MinPitch, MaxPitch);
+	if (!_pitchLocked)
+	{
+		float dy = m.Relative.Y * MouseSensitivity * (InvertY ? 1f : -1f);
+		_pitchDeg = Mathf.Clamp(_pitchDeg + dy, MinPitch, MaxPitch);
+	}
+	else
+	{
+		// Keep exactly at horizon while locked
+		_pitchDeg = 0f;
+	}
 
-			// Apply rotation only on X to the camera (no roll, no local yaw)
-			if (_cam != null)
-				_cam.RotationDegrees = new Vector3(_pitchDeg, 0f, 0f);
-		}
+	if (_cam != null)
+		_cam.RotationDegrees = new Vector3(_pitchDeg, 0f, 0f);
+}
+
+
 
 		// --- ESC KEY ---
 		// Releases the mouse so the player can interact with UI or exit.
@@ -259,5 +268,38 @@ if (HasMeta("justReturnedFromSlice") && (bool)GetMeta("justReturnedFromSlice"))
 	// kill momentum immediately
 	Velocity = Vector3.Zero;
 }
+
+public void LockPitch(bool snapToHorizon = true)
+{
+	_pitchLocked = true;
+	if (snapToHorizon)
+	{
+		_pitchDeg = 0f;                   // horizon
+		if (_cam != null) _cam.RotationDegrees = new Vector3(_pitchDeg, 0f, 0f);
+	}
+	_lockedPitchDeg = _pitchDeg;          // remember the exact value we’re keeping
+}
+
+public void UnlockPitch()
+{
+	_pitchLocked = false;
+}
+
+public void LockPitchToHorizon()
+{
+	_pitchLocked = true;
+
+	// Snap camera to exact horizon
+	_savedPitchDeg = 0f;
+	_pitchDeg = 0f;
+
+	if (_cam != null)
+	{
+		// zero any inherited tilt/roll too
+		_cam.RotationDegrees = new Vector3(0f, 0f, 0f);
+	}
+}
+
+
 	
 }
