@@ -22,6 +22,7 @@ window/size/mode=2
 [dotnet]
 
 project/assembly_name="Slicer"
+<<<<<<< HEAD
 
 [input]
 
@@ -49,3 +50,5 @@ jump={
 [rendering]
 
 textures/canvas_textures/default_texture_filter=0
+=======
+>>>>>>> parent of 6ee1342 (Added 2D idle animation sprite sheet, applied to 2D player controller. GIT LFS should hopefully be working)

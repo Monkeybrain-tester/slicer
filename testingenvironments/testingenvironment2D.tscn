@@ -1,7 +1,13 @@
+<<<<<<< HEAD
 [gd_scene load_steps=117 format=4 uid="uid://c73whxqs1btet"]
+=======
+[gd_scene load_steps=7 format=4 uid="uid://c73whxqs1btet"]
+>>>>>>> parent of 6ee1342 (Added 2D idle animation sprite sheet, applied to 2D player controller. GIT LFS should hopefully be working)
 
+[ext_resource type="Texture2D" uid="uid://cm80umwyhsyqf" path="res://testingenvironments/placeholdersprite.png" id="1_6dlfn"]
 [ext_resource type="Texture2D" uid="uid://btaxtn2u3psfx" path="res://Tileset_Templates/Tileset_Templates/Tileset_2D Platformer.png" id="2_hbkwt"]
 [ext_resource type="Script" uid="uid://bjk0m1g3olv53" path="res://testingenvironments/Player.cs" id="2_yvp0e"]
+<<<<<<< HEAD
 [ext_resource type="Texture2D" uid="uid://dgsg48v07rmt7" path="res://player_assets/jumping_animation/3.png" id="3_ltrbm"]
 [ext_resource type="Texture2D" uid="uid://b01i3e26hqp31" path="res://player_assets/idle_animation/00.png" id="3_rcqyx"]
 [ext_resource type="Texture2D" uid="uid://lpfju8ld3xr6" path="res://player_assets/idle_animation/01.png" id="4_kfx7k"]
@@ -67,6 +73,8 @@
 [ext_resource type="Texture2D" uid="uid://ddu2ln77ep0g6" path="res://player_assets/push_animation/21.png" id="53_akei6"]
 [ext_resource type="Texture2D" uid="uid://ctlv72buk3oyq" path="res://player_assets/push_animation/22.png" id="54_ne531"]
 [ext_resource type="Texture2D" uid="uid://cwv308heb6fm5" path="res://player_assets/push_animation/23.png" id="55_l8dcw"]
+=======
+>>>>>>> parent of 6ee1342 (Added 2D idle animation sprite sheet, applied to 2D player controller. GIT LFS should hopefully be working)
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_yvp0e"]
 texture = ExtResource("2_hbkwt")
@@ -420,6 +428,7 @@ texture = ExtResource("2_hbkwt")
 physics_layer_0/collision_layer = 1
 sources/0 = SubResource("TileSetAtlasSource_yvp0e")
 
+<<<<<<< HEAD
 [sub_resource type="SpriteFrames" id="SpriteFrames_hbkwt"]
 animations = [{
 "frames": [{
@@ -1135,6 +1144,11 @@ states/takeoff/node = SubResource("AnimationNodeAnimation_mkkhc")
 states/takeoff/position = Vector2(272, 374)
 transitions = ["Start", "idle", SubResource("AnimationNodeStateMachineTransition_w0kn8"), "idle", "takeoff", SubResource("AnimationNodeStateMachineTransition_dskx2"), "takeoff", "running", SubResource("AnimationNodeStateMachineTransition_ludg5"), "falling", "landing", SubResource("AnimationNodeStateMachineTransition_u8p8n"), "landing", "takeoff", SubResource("AnimationNodeStateMachineTransition_d3qiv"), "landing", "idle", SubResource("AnimationNodeStateMachineTransition_ngkyo"), "jump", "falling_init", SubResource("AnimationNodeStateMachineTransition_83dn1"), "falling_init", "falling", SubResource("AnimationNodeStateMachineTransition_frw8n"), "landing", "running", SubResource("AnimationNodeStateMachineTransition_rse16"), "running", "skid", SubResource("AnimationNodeStateMachineTransition_ytnpj"), "skid", "idle", SubResource("AnimationNodeStateMachineTransition_0bfwg"), "idle", "jump", SubResource("AnimationNodeStateMachineTransition_6cemo"), "skid", "jump", SubResource("AnimationNodeStateMachineTransition_ggjus"), "skid", "falling_init", SubResource("AnimationNodeStateMachineTransition_f2h6o"), "idle", "falling_init", SubResource("AnimationNodeStateMachineTransition_bbmhn"), "running", "falling_init", SubResource("AnimationNodeStateMachineTransition_mkkhc"), "takeoff", "falling_init", SubResource("AnimationNodeStateMachineTransition_jsr5u"), "takeoff", "push", SubResource("AnimationNodeStateMachineTransition_vmc8r"), "running", "push", SubResource("AnimationNodeStateMachineTransition_r3ktn"), "push", "stop_pushing", SubResource("AnimationNodeStateMachineTransition_3e6ck"), "stop_pushing", "idle", SubResource("AnimationNodeStateMachineTransition_g45j2")]
 graph_offset = Vector2(-91, 25.8474)
+=======
+[sub_resource type="CapsuleShape2D" id="CapsuleShape2D_yvp0e"]
+radius = 91.5295
+height = 347.246
+>>>>>>> parent of 6ee1342 (Added 2D idle animation sprite sheet, applied to 2D player controller. GIT LFS should hopefully be working)
 
 [node name="Node2D" type="Node2D"]
 process_mode = 3
@@ -1161,6 +1175,7 @@ Acceleration = 2500.0
 LowJumpMultiplier = 0.3
 Friction = 4000.0
 
+<<<<<<< HEAD
 [node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="Player"]
 position = Vector2(0, -209.885)
 scale = Vector2(2.77978, 2.77978)
@@ -1168,6 +1183,10 @@ sprite_frames = SubResource("SpriteFrames_hbkwt")
 animation = &"takeoff"
 autoplay = "idle"
 frame = 1
+=======
+[node name="Playersprite" type="Sprite2D" parent="Player"]
+texture = ExtResource("1_6dlfn")
+>>>>>>> parent of 6ee1342 (Added 2D idle animation sprite sheet, applied to 2D player controller. GIT LFS should hopefully be working)
 
 [node name="Camera2D" type="Camera2D" parent="Player"]
 position = Vector2(0, -400)
