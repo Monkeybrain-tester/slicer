@@ -1,11 +1,11 @@
 [gd_scene load_steps=58 format=4 uid="uid://bxg071f16f7kb"]
 
-[ext_resource type="Script" uid="uid://cdvglavl4o7yc" path="res://Levels/LevelRoot.cs" id="1_ersrp"]
-[ext_resource type="Script" uid="uid://dxn0hktjcsl30" path="res://SlicerTestRoom/Player1.cs" id="1_x6r5i"]
-[ext_resource type="Script" uid="uid://onc4krrl3yo4" path="res://SlicerTestRoom/SliceManager.cs" id="2_n06ab"]
-[ext_resource type="Texture2D" uid="uid://b0hdg7n3mnv06" path="res://art/dashed_purple.png" id="3_rnngu"]
-[ext_resource type="Material" uid="uid://cb4tpirh2ecfs" path="res://Levels/testmaterial.tres" id="5_kv2lc"]
-[ext_resource type="Script" uid="uid://d18c1iaaxje2k" path="res://SlicerTestRoom/CrosshairHud.cs" id="6_6ghb1"]
+[ext_resource type="Script" uid="uid://cdvglavl4o7yc" path="res://Levels/LevelRoot.cs" id="1_6ghb1"]
+[ext_resource type="Script" uid="uid://dxn0hktjcsl30" path="res://SlicerTestRoom/Player1.cs" id="2_vjhoh"]
+[ext_resource type="Script" uid="uid://onc4krrl3yo4" path="res://SlicerTestRoom/SliceManager.cs" id="3_g8k58"]
+[ext_resource type="Texture2D" uid="uid://b0hdg7n3mnv06" path="res://art/dashed_purple.png" id="4_lcacp"]
+[ext_resource type="Material" uid="uid://cb4tpirh2ecfs" path="res://Levels/testmaterial.tres" id="5_jk0ww"]
+[ext_resource type="Script" uid="uid://d18c1iaaxje2k" path="res://SlicerTestRoom/CrosshairHud.cs" id="6_qybk6"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_vqhxe"]
 radius = 0.125619
@@ -295,7 +295,7 @@ _surfaces = [{
 data = PackedVector3Array(-1.7015, 2.1663, -1, 2.5959, -1.8174, -1, -1.2863, 2.1731, -1, -1.2863, 2.1731, 0, -1.2863, 2.1731, -1, 2.5959, -1.8174, -1, -1.7015, 2.1663, -1, -1.7015, 2.1663, 0, 2.5959, -1.8174, 0, -1.2863, 2.1731, 0, 2.5959, -1.8174, 0, -1.7015, 2.1663, 0, -1.2863, 2.1731, -1, 2.5351, 4.8477, -1, -1.7015, 2.1663, -1, -1.7015, 2.1663, 0, -1.7015, 2.1663, -1, 2.5351, 4.8477, -1, -1.2863, 2.1731, -1, -1.2863, 2.1731, 0, 2.5351, 4.8477, 0, -1.7015, 2.1663, 0, 2.5351, 4.8477, 0, -1.2863, 2.1731, 0, 2.5959, -1.8174, 0, 2.5959, -1.8174, -1, -1.7015, 2.1663, -1, 2.5959, -1.8174, -1, 2.5959, -1.8174, 0, -1.2863, 2.1731, 0, 2.5351, 4.8477, 0, 2.5351, 4.8477, -1, -1.2863, 2.1731, -1, 2.5351, 4.8477, -1, 2.5351, 4.8477, 0, -1.7015, 2.1663, 0)
 
 [node name="LevelTemplate" type="Node3D"]
-script = ExtResource("1_ersrp")
+script = ExtResource("1_6ghb1")
 PlayerPath = NodePath("")
 SpawnPath = NodePath("")
 
@@ -303,7 +303,7 @@ SpawnPath = NodePath("")
 
 [node name="Player1" type="CharacterBody3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.368516, -35.6154, -1.38682)
-script = ExtResource("1_x6r5i")
+script = ExtResource("2_vjhoh")
 CameraPath = NodePath("Camera3D")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Player1"]
@@ -323,12 +323,12 @@ current = true
 
 [node name="SliceManager" type="Node3D" parent="."]
 transform = Transform3D(0.835381, 0, 0, 0, 0.835381, 0, 0, 0, 0.835381, -0.502663, -36.8078, -0.0420797)
-script = ExtResource("2_n06ab")
+script = ExtResource("3_g8k58")
 PlayerPath = NodePath("../Player1")
 RoomRootPath = NodePath("../Room")
 TargetMeshes = Array[NodePath]([])
 CrosshairPath = NodePath("../HUD/CrosshairHud")
-GuideTexture = ExtResource("3_rnngu")
+GuideTexture = ExtResource("4_lcacp")
 GuideHeight = 500.0
 GuideThickness = 0.05
 MaxPreviewDistance = 500.0
@@ -410,7 +410,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -19.4601, 13.4578, 0)
 [node name="GapWallRight" type="MeshInstance3D" parent="." groups=["sliceable"]]
 transform = Transform3D(-4.37114e-08, 0, -1, 0, 1, 0, 1, 0, -4.37114e-08, -15.0585, 10.5853, -6.66268)
 mesh = SubResource("ArrayMesh_ersrp")
-surface_material_override/0 = ExtResource("5_kv2lc")
+surface_material_override/0 = ExtResource("5_jk0ww")
 
 [node name="StaticBody3D" type="StaticBody3D" parent="GapWallRight"]
 
@@ -420,7 +420,7 @@ shape = SubResource("ConcavePolygonShape3D_kv2lc")
 [node name="GapWallLeft" type="MeshInstance3D" parent="." groups=["sliceable"]]
 transform = Transform3D(0.0130372, 0, -0.999915, 0, 1, 0, 0.999915, 0, 0.0130372, -15.0585, 10.5853, 8.1672)
 mesh = SubResource("ArrayMesh_ersrp")
-surface_material_override/0 = ExtResource("5_kv2lc")
+surface_material_override/0 = ExtResource("5_jk0ww")
 
 [node name="StaticBody3D" type="StaticBody3D" parent="GapWallLeft"]
 
@@ -430,7 +430,7 @@ shape = SubResource("ConcavePolygonShape3D_6ghb1")
 [node name="SlicableWall3" type="MeshInstance3D" parent="." groups=["sliceable"]]
 transform = Transform3D(-4.37114e-08, 0, -1, 0, 1, 0, 1, 0, -4.37114e-08, 13.3684, 10.5853, 0.596872)
 mesh = SubResource("ArrayMesh_vjhoh")
-surface_material_override/0 = ExtResource("5_kv2lc")
+surface_material_override/0 = ExtResource("5_jk0ww")
 
 [node name="StaticBody3D" type="StaticBody3D" parent="SlicableWall3"]
 
@@ -440,7 +440,7 @@ shape = SubResource("ConcavePolygonShape3D_g8k58")
 [node name="SlicableWall2" type="MeshInstance3D" parent="." groups=["sliceable"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.965375, 10.5853, -11.8374)
 mesh = SubResource("ArrayMesh_vjhoh")
-surface_material_override/0 = ExtResource("5_kv2lc")
+surface_material_override/0 = ExtResource("5_jk0ww")
 
 [node name="StaticBody3D" type="StaticBody3D" parent="SlicableWall2"]
 
@@ -450,7 +450,7 @@ shape = SubResource("ConcavePolygonShape3D_lcacp")
 [node name="SlicableWall1" type="MeshInstance3D" parent="." groups=["sliceable"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.797515, 11.079, 12.5156)
 mesh = SubResource("ArrayMesh_vjhoh")
-surface_material_override/0 = ExtResource("5_kv2lc")
+surface_material_override/0 = ExtResource("5_jk0ww")
 
 [node name="StaticBody3D" type="StaticBody3D" parent="SlicableWall1"]
 
@@ -669,5 +669,5 @@ layout_mode = 3
 anchors_preset = 0
 offset_right = 40.0
 offset_bottom = 40.0
-script = ExtResource("6_6ghb1")
+script = ExtResource("6_qybk6")
 metadata/_edit_use_anchors_ = true

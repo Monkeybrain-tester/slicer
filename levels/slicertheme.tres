@@ -1,0 +1,6 @@
+[gd_resource type="Theme" load_steps=2 format=3 uid="uid://2p3p8i8xyx8y"]
+
+[ext_resource type="FontFile" path="res://art/fonts/Sixtyfour-Regular-VariableFont_BLED,SCAN.ttf" id="1_l5yxo"]
+
+[resource]
+default_font = ExtResource("1_l5yxo")
