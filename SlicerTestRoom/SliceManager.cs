@@ -4,12 +4,27 @@ using System;
 using System.Linq;
 using System.Collections.Generic;
 
+/// <summary>
+/// Manages taking a 3D cross-section ("slice") of the world,
+/// building a 2D level from that slice, and mapping 2D motion
+/// back into 3D when you exit the slice.
+/// 
+/// Key points:
+/// - Slice plane is vertical, using camera RIGHT as the normal,
+///   with pitch flattened when ForceVertical = true.
+/// - 2D space uses:
+///     X₂D along _basisU  (horizontal in plane)
+///     Y₂D downwards, derived from world Up (basisV = Vector3.Up)
+/// - PlayerStart2D is computed using the room floor as a vertical
+///   reference, so your height above the floor in 3D is preserved
+///   in the 2D slice.
+/// </summary>
 public partial class SliceManager : Node3D
 {
-	// ---------- Links ----------
+	// ---------- Scene links ----------
 	[ExportGroup("Scene Links")]
 	[Export] public NodePath PlayerPath;     // CharacterBody3D (your Player1)
-	[Export] public NodePath RoomRootPath;   // Parent of sliceable meshes
+	[Export] public NodePath RoomRootPath;   // Parent of sliceable meshes (e.g. LevelTemplate/Room)
 	[Export] public NodePath[] TargetMeshes; // Optional explicit mesh list
 
 	[ExportGroup("UI")]
@@ -18,60 +33,52 @@ public partial class SliceManager : Node3D
 	// ---------- Preview (Decal guide) ----------
 	[ExportGroup("Projected Guide")]
 	[Export] public bool UseProjectedGuide = true;
-	[Export] public Texture2D GuideTexture;                      // dashed texture
+	[Export] public Texture2D GuideTexture;   // dashed texture
 	[Export] public Color GuideTint = new Color(0.9f, 0.5f, 1, 1);
-	[Export] public float GuideHeight = 6.0f;                    // visual height
-	[Export] public float GuideThickness = 0.25f;                // decal depth
+	[Export] public float GuideHeight = 6.0f; // visual height
+	[Export] public float GuideThickness = 0.25f;
 	[Export] public float MaxPreviewDistance = 200.0f;
 
 	// ---------- Slice behavior / visuals ----------
 	[ExportGroup("Slice Behavior")]
-	[Export] public bool KeepBackHalf = false;                   // keep the sliced-away side as a new MeshInstance3D
-	[Export] public bool ForceVertical = true;                   // zero Y on plane normal (vertical slice)
-	[Export] public bool ShowCap = true;                         // fill the cut with a cap
-	[Export] public Material CapMaterial;                        // material for visual cap
+	[Export] public bool KeepBackHalf = false; // keep the sliced-away side as a new MeshInstance3D
+	[Export] public bool ForceVertical = true; // zero Y on plane normal (vertical slice)
+	[Export] public bool ShowCap = true;       // fill the cut with a cap
+	[Export] public Material CapMaterial;      // material for visual cap
 
 	// ---------- 2D Runtime ----------
 	[ExportGroup("2D Runtime")]
 	[Export] public string Slice2DScenePath = "res://2Dportion/Slice2D.tscn";
-	[Export] public float SliceUnitsPerPixel = 0.02f;            // 3D meters per 2D pixel
+	/// <summary>
+	/// 3D meters per 2D "slice unit" in projection.
+	/// Smaller → more world space per 2D pixel.
+	/// </summary>
+	[Export] public float SliceUnitsPerPixel = 0.02f;
 
 	// ---------- Input ----------
 	[ExportGroup("Input Actions")]
-	[Export] public string SliceAimAction = "slice_aim";         // LMB (hold)
-	[Export] public string SliceExitAction = "slice_exit";       // RMB / E (in 2D)
+	[Export] public string SliceAimAction = "slice_aim";   // LMB (hold)
+	[Export] public string SliceExitAction = "slice_exit"; // RMB / E (in 2D)
 
-	// ---------- Vertical Snap 3D return ----------
-	[ExportGroup("Return From 2D")]
-	[Export] public float ReturnUpNudge = 0.25f;   // small upward lift (meters)
-	[Export] public float GroundSnapProbe = 2.0f; // how far down we raycast to find ground
-	[Export] public float StandClearance = 0.05f; // gap above the ground after snap
-	[Export] public bool  EnableGroundSnap = true;
-
-[ExportGroup("Return Placement")]
-[Export] public float GroundRayUp = 0.6f;      // ray starts this far above target
-[Export] public float GroundRayDown = 2.0f;    // and casts this far below
-[Export] public float DeadzonePixels = 6f;     // suppress tiny 2D jitters on exit
-
+	// ---------- Return From 2D ----------
+	[ExportGroup("2D → 3D Return")]
+	[Export] public float DeadzonePixels = 4f; // ignore tiny 2D jitters on exit
 
 	// ---------- Private state ----------
 	private CharacterBody3D _player;
 	private Node _roomRoot;
 	private Control _crosshair;
 	private Camera3D _cam;
-
 	private Decal _guideDecal;
 
-	// current aim plane (world)
+	// Current slice plane (in world)
 	private Vector3 _aimOrigin;
-	private Vector3 _aimNormal; // camera RIGHT (vertical plane)
-	private Vector3 _slicePlaneNormal = Vector3.Forward; // default until slice created
+	private Vector3 _aimNormal;          // plane normal (camera RIGHT, flattened if ForceVertical)
+	private Vector3 _slicePlaneNormal;   // same as _aimNormal, cached for return
 
-
-
-	// plane basis used to project 3D → 2D (U forward, V up-in-plane)
-	private Vector3 _basisU;      // forward along camera view (−Z)
-	private Vector3 _basisV;      // n × U  (up inside the plane)
+	// Basis used to project 3D → 2D (X = horizontal in plane, Y = up)
+	private Vector3 _basisU; // horizontal axis in plane
+	private Vector3 _basisV; // vertical axis (world Up)
 
 	// ------------------------------------------------------------
 	public override void _Ready()
@@ -83,10 +90,9 @@ public partial class SliceManager : Node3D
 
 		EnsureInputActions();
 
-		// Auto-discover meshes if not provided
-if ((TargetMeshes == null || TargetMeshes.Length == 0))
-	AutoDiscoverSliceTargetsFromGroup("sliceable");
-
+		// Auto-discover sliceable meshes from a group if no explicit targets
+		if (TargetMeshes == null || TargetMeshes.Length == 0)
+			AutoDiscoverSliceTargetsFromGroup("sliceable");
 
 		// Build preview decal
 		if (UseProjectedGuide)
@@ -105,7 +111,8 @@ if ((TargetMeshes == null || TargetMeshes.Length == 0))
 			_guideDecal.NormalFade = 0f;
 		}
 
-		if (_crosshair != null) _crosshair.Visible = false;
+		if (_crosshair != null)
+			_crosshair.Visible = false;
 	}
 
 	public override void _Input(InputEvent e)
@@ -126,69 +133,69 @@ if ((TargetMeshes == null || TargetMeshes.Length == 0))
 	// Aim / Preview
 	// ------------------------------------------------------------
 	private void BeginAim()
-{
-	if (_crosshair != null) _crosshair.Visible = true;
-	if (_guideDecal != null) _guideDecal.Visible = true;
-
-	// Hard-lock pitch to horizon while aiming
-	if (_player is Player1 p1) p1.LockPitchToHorizon();
-
-	UpdatePreview();
-}
-
-
-private void EndAimAndSlice()
-{
-	if (_crosshair != null) _crosshair.Visible = false;
-	if (_guideDecal != null) _guideDecal.Visible = false;
-
-	// Unlock vertical look now that we captured the slice plane
-	if (_player is Player1 p1) p1.UnlockPitch();
-
-	// --- Step 1: Capture aim origin & normal from camera or player ---
-	if (_cam != null)
 	{
-		_aimOrigin = _cam.GlobalPosition;
-		_aimNormal = _cam.GlobalTransform.Basis.X;   // camera right vector
-	}
-	else if (_player != null)
-	{
-		_aimOrigin = _player.GlobalPosition;
-		_aimNormal = _player.GlobalTransform.Basis.X;
-	}
-	else
-	{
-		_aimOrigin = Vector3.Zero;
-		_aimNormal = Vector3.Right;
+		if (_crosshair != null) _crosshair.Visible = true;
+		if (_guideDecal != null) _guideDecal.Visible = true;
+
+		// Hard-lock pitch to horizon while aiming (if Player1 implements these)
+		if (_player is Player1 p1)
+			p1.LockPitchToHorizon();
+
+		UpdatePreview();
 	}
 
-	// --- Step 2: Force vertical slice (remove camera pitch) ---
-	if (ForceVertical)
+	private void EndAimAndSlice()
 	{
-		_aimNormal.Y = 0f;                      // flatten tilt
-		if (_aimNormal.LengthSquared() < 1e-6f)
-			_aimNormal = Vector3.Right;         // fallback
+		if (_crosshair != null) _crosshair.Visible = false;
+		if (_guideDecal != null) _guideDecal.Visible = false;
+
+		// Unlock pitch
+		if (_player is Player1 p1)
+			p1.UnlockPitch();
+
+		// 1) Capture plane origin + normal from camera or player
+		if (_cam != null)
+		{
+			_aimOrigin = _cam.GlobalPosition;
+			_aimNormal = _cam.GlobalTransform.Basis.X; // camera RIGHT
+		}
+		else if (_player != null)
+		{
+			_aimOrigin = _player.GlobalPosition;
+			_aimNormal = _player.GlobalTransform.Basis.X;
+		}
+		else
+		{
+			_aimOrigin = Vector3.Zero;
+			_aimNormal = Vector3.Right;
+		}
+
+		// 2) Flatten tilt (vertical slice)
+		if (ForceVertical)
+		{
+			_aimNormal.Y = 0f;
+			if (_aimNormal.LengthSquared() < 1e-6f)
+				_aimNormal = Vector3.Right;
+		}
+		_aimNormal = _aimNormal.Normalized();
+
+		// 3) Build 2D projection basis
+		//    - basisV = world Up (2D Y is up before flipping)
+		//    - basisU = basisV × normal (horizontal along slice plane)
+		_basisV = Vector3.Up;
+		_basisU = _basisV.Cross(_aimNormal).Normalized();
+		if (_basisU.LengthSquared() < 1e-6f)
+			_basisU = Vector3.Forward;
+		_basisV = _basisV.Normalized();
+
+		// 4) Cache slice normal for return mapping
+		_slicePlaneNormal = _aimNormal;
+
+		GD.Print($"[SliceManager] Slice Plane -> Normal:{_slicePlaneNormal}  U:{_basisU}  V:{_basisV}");
+
+		// 5) Execute slice
+		ExecuteSlice();
 	}
-	_aimNormal = _aimNormal.Normalized();
-
-	// --- Step 3: Define 2D-projection basis ---
-	// 2D.X = horizontal along slice plane
-	// 2D.Y = world up
-	_basisV = Vector3.Up;                                       // up/down in slice = world Y
-	_basisU = _basisV.Cross(_aimNormal).Normalized();           // horizontal axis in slice
-	if (_basisU.LengthSquared() < 1e-6f) _basisU = Vector3.Forward;
-	_basisV = _basisV.Normalized();
-
-	// --- Step 4: Record slice normal for return translation ---
-	_slicePlaneNormal = _aimNormal;                             // store for OnSliceExit2D()
-
-	// --- Optional: debug print ---
-	GD.Print($"[SliceManager] Slice Plane -> Normal:{_slicePlaneNormal}  U:{_basisU}  V:{_basisV}");
-
-	// --- Step 5: Execute the slice ---
-	ExecuteSlice();
-}
-
 
 	private void UpdatePreview()
 	{
@@ -205,28 +212,41 @@ private void EndAimAndSlice()
 		// width axis = camera FORWARD (so dashes go away from you)
 		Vector3 widthAxis = (-cb.Z).Normalized();
 		Vector3 heightAxis = _aimNormal.Cross(widthAxis).Normalized();
-		if (heightAxis.LengthSquared() < 1e-6f) heightAxis = Vector3.Up;
+		if (heightAxis.LengthSquared() < 1e-6f)
+			heightAxis = Vector3.Up;
 
-		// bound the decal by raycasting forward/back
 		var space = GetWorld3D().DirectSpaceState;
+
+		// forward ray
 		var front = PhysicsRayQueryParameters3D.Create(origin, origin + widthAxis * MaxPreviewDistance);
-		front.CollideWithBodies = true; front.CollideWithAreas = false;
-
-		var back  = PhysicsRayQueryParameters3D.Create(origin, origin - widthAxis * MaxPreviewDistance);
-		back.CollideWithBodies = true; back.CollideWithAreas = false;
-
+		front.CollideWithBodies = true;
+		front.CollideWithAreas = false;
 		var hitF = space.IntersectRay(front);
+
+		// backward ray
+		var back = PhysicsRayQueryParameters3D.Create(origin, origin - widthAxis * MaxPreviewDistance);
+		back.CollideWithBodies = true;
+		back.CollideWithAreas = false;
 		var hitB = space.IntersectRay(back);
 
-		float dF = (hitF.Count > 0 && hitF.ContainsKey("position")) ? ((Vector3)hitF["position"] - origin).Length() : MaxPreviewDistance;
-		float dB = (hitB.Count > 0 && hitB.ContainsKey("position")) ? ((Vector3)hitB["position"] - origin).Length() : MaxPreviewDistance;
+		float dF = (hitF.Count > 0 && hitF.ContainsKey("position"))
+			? ((Vector3)hitF["position"] - origin).Length()
+			: MaxPreviewDistance;
+
+		float dB = (hitB.Count > 0 && hitB.ContainsKey("position"))
+			? ((Vector3)hitB["position"] - origin).Length()
+			: MaxPreviewDistance;
 
 		Vector3 center = origin + widthAxis * ((dF - dB) * 0.5f);
 
 		if (_guideDecal != null)
 		{
-			_guideDecal.Size = new Vector3(Mathf.Max(0.1f, dF + dB), Mathf.Max(0.1f, GuideHeight), Mathf.Max(0.02f, GuideThickness));
-			Basis decalBasis = new Basis(widthAxis, heightAxis, _aimNormal); // +Z = normal
+			_guideDecal.Size = new Vector3(
+				Mathf.Max(0.1f, dF + dB),
+				Mathf.Max(0.1f, GuideHeight),
+				Mathf.Max(0.02f, GuideThickness)
+			);
+			Basis decalBasis = new Basis(widthAxis, heightAxis, _aimNormal);
 			_guideDecal.GlobalTransform = new Transform3D(decalBasis, center);
 		}
 	}
@@ -234,178 +254,126 @@ private void EndAimAndSlice()
 	// ------------------------------------------------------------
 	// Slice execution
 	// ------------------------------------------------------------
-private void ExecuteSlice()
-{
-	// Plane in world, plus the 2D axes we’ll use
-	var worldPlane = new Plane(_aimNormal, _aimOrigin.Dot(_aimNormal));
-
-	// Axis convention: U = forward (−camera.Z), V = in-plane up (n × U).
-	// We already computed these in EndAimAndSlice();
-	// They define the 3D→2D projection used below.
-
-	var segmentsWorld = new List<(Vector3 A, Vector3 B)>();
-	var capPointsWorld = new List<Vector3>(); // still useful for a visual cap
-
-	// Precompute 3 points on the plane and transform per mesh → local plane
-	Vector3 t = BuildPlaneTangent(_aimNormal);
-	Vector3 b = _aimNormal.Cross(t);
-	Vector3 wp0 = _aimOrigin;
-	Vector3 wp1 = _aimOrigin + t;
-	Vector3 wp2 = _aimOrigin + b;
-
-	foreach (var path in TargetMeshes ?? Array.Empty<NodePath>())
+	private void ExecuteSlice()
 	{
-		var mi = GetNodeOrNull<MeshInstance3D>(path);
-		if (mi == null || mi.Mesh == null) continue;
+		var worldPlane = new Plane(_aimNormal, _aimOrigin.Dot(_aimNormal));
 
-		var am = ConvertToArrayMesh(mi.Mesh);
-		if (am == null) continue;
+		// For 3D cap (optional) and for 2D loops
+		var segmentsWorld = new List<(Vector3 A, Vector3 B)>();
+		var capPointsWorld = new List<Vector3>();
 
-		// world plane → local plane via 3-point method
-		var toLocal = mi.GlobalTransform.AffineInverse();
-		Vector3 lp0 = toLocal * wp0;
-		Vector3 lp1 = toLocal * wp1;
-		Vector3 lp2 = toLocal * wp2;
-		Vector3 lN  = (lp1 - lp0).Cross(lp2 - lp0).Normalized();
-		Plane localPlane = new Plane(lN, lp0.Dot(lN));
+		// 3 points on the plane to transform into local space
+		Vector3 t = BuildPlaneTangent(_aimNormal);
+		Vector3 b = _aimNormal.Cross(t);
+		Vector3 wp0 = _aimOrigin;
+		Vector3 wp1 = _aimOrigin + t;
+		Vector3 wp2 = _aimOrigin + b;
 
-		// slice: require SectionSegments from SliceMeshUtility
-		var res = SliceMeshUtility.Slice(am, localPlane);
-
-		// (optional) keep front/back meshes as you already do
-		if (res.FrontMesh != null) mi.Mesh = res.FrontMesh;
-		if (KeepBackHalf && res.BackMesh != null)
+		foreach (var path in TargetMeshes ?? Array.Empty<NodePath>())
 		{
-			var back = new MeshInstance3D { Mesh = res.BackMesh, GlobalTransform = mi.GlobalTransform };
-			mi.GetParent().AddChild(back);
-		}
+			var mi = GetNodeOrNull<MeshInstance3D>(path);
+			if (mi == null || mi.Mesh == null) continue;
 
-		// collect raw section data
-		if (res.SectionSegments != null && res.SectionSegments.Count > 0)
-		{
-			foreach (var seg in res.SectionSegments)
-				segmentsWorld.Add((mi.GlobalTransform * seg.A, mi.GlobalTransform * seg.B));
-		}
-		else if (res.SectionLoop != null && res.SectionLoop.Count > 0)
-		{
-			// legacy point-bag: still add to cap for visuals
-			foreach (var p in res.SectionLoop)
-				capPointsWorld.Add(mi.GlobalTransform * p);
-		}
-	}
+			var am = ConvertToArrayMesh(mi.Mesh);
+			if (am == null) continue;
 
-	// ----------------------------
-	// PROJECT → 2D & BUILD LOOPS
-	// ----------------------------
-	var segs2D = new List<(Vector2 A, Vector2 B)>(segmentsWorld.Count);
-	foreach (var (A, B) in segmentsWorld)
-	{
-		Vector3 ra = A - _aimOrigin;
-		Vector3 rb = B - _aimOrigin;
-		float ua = ra.Dot(_basisU), va = ra.Dot(_basisV);
-		float ub = rb.Dot(_basisU), vb = rb.Dot(_basisV);
+			// world plane -> local plane
+			var toLocal = mi.GlobalTransform.AffineInverse();
+			Vector3 lp0 = toLocal * wp0;
+			Vector3 lp1 = toLocal * wp1;
+			Vector3 lp2 = toLocal * wp2;
+			Vector3 lN = (lp1 - lp0).Cross(lp2 - lp0).Normalized();
+			Plane localPlane = new Plane(lN, lp0.Dot(lN));
 
-		// Flip V for "up is +Y" in 2D and apply scale
-		segs2D.Add((new Vector2(ua / SliceUnitsPerPixel, -va / SliceUnitsPerPixel),
-					new Vector2(ub / SliceUnitsPerPixel, -vb / SliceUnitsPerPixel)));
-	}
+			// slice
+			var res = SliceMeshUtility.Slice(am, localPlane);
 
-	// Assemble closed loops from segments
-	var loops = BuildLoopsFromSegments2D(segs2D, eps: 0.5f); // tweak eps if needed
+			// keep front mesh in place
+			if (res.FrontMesh != null)
+				mi.Mesh = res.FrontMesh;
 
-	// Classify outer vs holes by area & containment
-	// Convention: positive Area2D => CCW. Depending on your projection flip,
-	// you might find holes come out as positive; we’ll still double-check by containment.
-	var outers = new List<List<Vector2>>();
-	var holes  = new List<List<Vector2>>();
-
-	foreach (var loop in loops)
-	{
-		var clean = loop;
-		if (clean.Count < 3) continue;
-
-		float area = Area2D(clean);
-		// normalize: ensure "outer" are CCW (positive)
-		if (area < 0f) clean.Reverse();
-
-		outers.Add(clean);
-	}
-
-	// Re-run containment to split inner “rings” as holes:
-	// A loop is a hole if it lies inside some larger outer and has opposite winding.
-	// (Because we reversed everything to CCW above, “holes” will naturally appear CW if we detect them raw.)
-	// We’ll test each loop against all others by area & containment.
-	var confirmedOuters = new List<List<Vector2>>();
-	var holeBuckets = new Dictionary<int, List<Vector2[]>>(); // outerIndex -> holes
-
-	// Sort by absolute area descending so big boundaries get considered first
-	var sorted = outers
-		.Select((poly, idx) => (poly, idx, area: Mathf.Abs(Area2D(poly))))
-		.OrderByDescending(x => x.area)
-		.ToList();
-
-	for (int i = 0; i < sorted.Count; i++)
-	{
-		var (polyI, idxI, _) = sorted[i];
-
-		bool containedByAnother = false;
-		for (int j = 0; j < sorted.Count; j++)
-		{
-			if (i == j) continue;
-			var (polyJ, idxJ, _) = sorted[j];
-			// quick bbox check can be added; here we just test centroid
-			Vector2 centroid = Vector2.Zero;
-			foreach (var p in polyI) centroid += p; centroid /= polyI.Count;
-
-			if (PointInPoly(centroid, polyJ))
+			// optional back half
+			if (KeepBackHalf && res.BackMesh != null)
 			{
-				// polyI is a HOLE inside polyJ
-				containedByAnother = true;
-				if (!holeBuckets.TryGetValue(idxJ, out var list)) { list = new List<Vector2[]>(); holeBuckets[idxJ] = list; }
-				list.Add(polyI.ToArray());
-				break;
+				var back = new MeshInstance3D
+				{
+					Mesh = res.BackMesh,
+					GlobalTransform = mi.GlobalTransform
+				};
+				mi.GetParent().AddChild(back);
+			}
+
+			// collect cross-section segments
+			if (res.SectionSegments != null && res.SectionSegments.Count > 0)
+			{
+				foreach (var seg in res.SectionSegments)
+				{
+					var aW = mi.GlobalTransform * seg.A;
+					var bW = mi.GlobalTransform * seg.B;
+					if ((bW - aW).LengthSquared() > 1e-10f)
+					{
+						segmentsWorld.Add((aW, bW));
+						capPointsWorld.Add(aW);
+						capPointsWorld.Add(bW);
+					}
+				}
+			}
+			else if (res.SectionLoop != null && res.SectionLoop.Count > 0)
+			{
+				foreach (var p in res.SectionLoop)
+					capPointsWorld.Add(mi.GlobalTransform * p);
 			}
 		}
 
-		if (!containedByAnother)
+		// Project segments to 2D slice space
+		var segs2D = new List<(Vector2 A, Vector2 B)>(segmentsWorld.Count);
+		foreach (var (A, B) in segmentsWorld)
 		{
-			confirmedOuters.Add(polyI);
+			Vector3 ra = A - _aimOrigin;
+			Vector3 rb = B - _aimOrigin;
+			float ua = ra.Dot(_basisU);
+			float va = ra.Dot(_basisV);
+			float ub = rb.Dot(_basisU);
+			float vb = rb.Dot(_basisV);
+
+			// y2D = -v / scale  (up becomes negative)
+			Vector2 a2 = new Vector2(ua / SliceUnitsPerPixel, -va / SliceUnitsPerPixel);
+			Vector2 b2 = new Vector2(ub / SliceUnitsPerPixel, -vb / SliceUnitsPerPixel);
+			segs2D.Add((a2, b2));
 		}
+
+		// Assemble loops from segments
+		var loops = BuildLoopsFromSegments2D(segs2D, eps: 0.5f);
+
+		// Classify outer vs holes and subtract holes using Geometry2D.ClipPolygons
+		var finalPolys = BuildSolidPolygonsFromLoops(loops);
+
+		// Debug: show unscaled Y range
+		if (GetPolyYRange(finalPolys, out float minY, out float maxY))
+		{
+			int totalPts = finalPolys.Sum(p => p?.Count ?? 0);
+			GD.Print($"[SliceManager DEBUG] Polygons2D loops={finalPolys.Count}, totalPts={totalPts}, Y-range=[{minY}, {maxY}]");
+		}
+		else
+		{
+			GD.Print("[SliceManager DEBUG] No polygons generated.");
+		}
+
+		// Optional visual cap in 3D
+		if (ShowCap && capPointsWorld.Count >= 3)
+		{
+			var cap = BuildCap(worldPlane, capPointsWorld, CapMaterial);
+			if (cap != null)
+				AddChild(cap);
+		}
+
+		// hand off to 2D
+		var segments2D = new List<Vector2[]>();
+		foreach (var (A, B) in segs2D)
+			segments2D.Add(new[] { A, B });
+
+		LaunchSlice2D(finalPolys, segments2D);
 	}
-
-	// Subtract holes from each outer using Geometry2D.ClipPolygons
-	var finalPolys = new List<List<Vector2>>();
-	foreach (var outer in confirmedOuters)
-	{
-		// find original index of this outer to fetch its holes
-		int outerIndex = outers.IndexOf(outer);
-		var holesForOuter = holeBuckets.TryGetValue(outerIndex, out var hs) ? hs : new List<Vector2[]>();
-
-		var solids = SubtractHoles(outer.ToArray(), holesForOuter);
-		foreach (var s in solids)
-			if (s != null && s.Length >= 3)
-				finalPolys.Add(new List<Vector2>(s));
-	}
-
-	// If nothing classified, fall back to all assembled loops
-	if (finalPolys.Count == 0)
-		finalPolys = loops;
-
-	// Optional visual cap (3D) from whatever world points we gathered
-	if (ShowCap && capPointsWorld.Count >= 3)
-	{
-		var cap = BuildCap(worldPlane, capPointsWorld, CapMaterial);
-		if (cap != null) AddChild(cap);
-	}
-
-	// ----------------------------
-	// HAND OFF TO 2D
-	// ----------------------------
-	var segments2D = new List<Vector2[]>(); // you can pass thin edges too, if desired
-
-	LaunchSlice2D(finalPolys, segments2D);
-}
-
 
 	// ------------------------------------------------------------
 	// 2D scene launch / return
@@ -425,71 +393,110 @@ private void ExecuteSlice()
 			GD.PushError("Slice2D.tscn root must have SliceLevel2D.cs attached.");
 			return;
 		}
-		
-		 // turn off 3D camera while in 2D
-		if (_cam != null) _cam.Current = false;  
 
+		// Turn off 3D camera while in 2D
+		if (_cam != null)
+			_cam.Current = false;
 
-		// pack data
+		// Pack geometry
 		level.Polygons2D = polygons2D ?? new();
 		level.Segments2D = segments2D ?? new();
 
-		// player start in 2D = projection of current 3D player onto plane
-		Vector3 projected = ProjectPointToPlane(_player.GlobalPosition, new Plane(_aimNormal, _aimOrigin.Dot(_aimNormal)));
-		Vector2 start2D   = ProjectWorldTo2D(projected);
+		// --- Compute PlayerStart2D using room floor as reference ---
+
+		// 1) Raycast to room floor under player
+		Vector3 floorHit3D;
+		bool gotFloor = TryRaycastRoomFloor(out floorHit3D);
+		float worldDeltaY = 0f;
+
+		if (gotFloor)
+			worldDeltaY = _player.GlobalPosition.Y - floorHit3D.Y;
+		else
+			GD.PushWarning("[SliceManager] TryRaycastRoomFloor failed; using plane projection only.");
+
+		// 2) Pick a 2D "floor" line from polygon Y range (unscaled)
+		float polyMinY, polyMaxY;
+		float floor2D_Y;
+		const float floorMargin = 20f; // in slice units
+
+		if (GetPolyYRange(polygons2D, out polyMinY, out polyMaxY))
+		{
+			floor2D_Y = polyMaxY + floorMargin;
+		}
+		else
+		{
+			floor2D_Y = 0f; // fallback baseline
+		}
+
+		// 3) Project player's XZ onto slice plane and into 2D
+		var slicePlane = new Plane(_aimNormal, _aimOrigin.Dot(_aimNormal));
+		Vector3 projectedOnPlane = ProjectPointToPlane(_player.GlobalPosition, slicePlane);
+		Vector2 projected2D = ProjectWorldTo2D(projectedOnPlane);
+
+		// 4) Convert world vertical offset into 2D offset
+		//    basisV = world Up, y2D = -v / scale => deltaY2D = -worldDeltaY / scale
+		float deltaY2D = -worldDeltaY / SliceUnitsPerPixel;
+		Vector2 start2D = new Vector2(projected2D.X, floor2D_Y + deltaY2D);
+
 		level.PlayerStart2D = start2D;
 
-		// add + connect
+		GD.Print(
+			"[SliceManager DEBUG] LaunchSlice2D (room-floor-based):\n" +
+			$"  playerPos3D    = {_player.GlobalPosition}\n" +
+			$"  gotFloor       = {gotFloor}\n" +
+			$"  floorHit3D     = {floorHit3D}\n" +
+			$"  worldDeltaY    = {worldDeltaY}\n" +
+			$"  polyYRange     = [{polyMinY}, {polyMaxY}]\n" +
+			$"  floor2D_Y      = {floor2D_Y}\n" +
+			$"  projected2D    = {projected2D}\n" +
+			$"  deltaY2D       = {deltaY2D}\n" +
+			$"  PlayerStart2D  = {start2D}\n" +
+			$"  SliceUnitsPerPixel = {SliceUnitsPerPixel}"
+		);
+
+		// Add 2D scene + hide 3D player
 		GetTree().CurrentScene.AddChild(level);
-		if (_player != null) _player.Visible = false;
+		if (_player != null)
+			_player.Visible = false;
 
 		level.Connect(SliceLevel2D.SignalName.SliceExit, new Callable(this, nameof(OnSliceExit2D)));
 	}
-	
-private void OnSliceExit2D(Vector2 delta2D)
-{
-	// 1) Deadzone tiny jitters from 2D frame (e.g., 1–6 px)
-	if (Mathf.Abs(delta2D.X) < DeadzonePixels) delta2D.X = 0f;
-	if (Mathf.Abs(delta2D.Y) < DeadzonePixels) delta2D.Y = 0f;
 
-	// 2) Map 2D Δ back to 3D using the SAME basis we used to project into 2D.
-	//    Remember: we flipped V when projecting (v -> -Y), so undo that here with a minus.
-	Vector3 delta3D =
-		_basisU * (delta2D.X * SliceUnitsPerPixel) +
-		_basisV * (-delta2D.Y * SliceUnitsPerPixel);
+	private void OnSliceExit2D(Vector2 delta2D)
+	{
+		GD.Print($"[SliceManager DEBUG] OnSliceExit2D: raw delta2D={delta2D}");
 
-	// 3) Compute the *target* world position on the slice plane + delta
-	Plane plane = new Plane(_aimNormal, _aimOrigin.Dot(_aimNormal));
-	Vector3 startOnPlane = ProjectPointToPlane(_player.GlobalPosition, plane);
-	Vector3 desired = startOnPlane + delta3D;
+		// Deadzone tiny jitter from 2D frame
+		if (Mathf.Abs(delta2D.X) < DeadzonePixels) delta2D.X = 0f;
+		if (Mathf.Abs(delta2D.Y) < DeadzonePixels) delta2D.Y = 0f;
 
-	// 4) Place safely on ground at desired (raycast down from a bit above),
-	//    then add a tiny upward nudge to prevent clipping.
-	Vector3 safe = SnapToGround(desired, GroundRayUp, GroundRayDown, ReturnUpNudge);
+		// 2D → 3D: same basis as projection, undo V sign flip
+		Vector3 delta3D =
+			_basisU * (delta2D.X * SliceUnitsPerPixel) +
+			_basisV * (-delta2D.Y * SliceUnitsPerPixel);
 
-	// 5) Hard-reset motion so gravity doesn’t tick before snap locks in.
-	_player.Velocity = Vector3.Zero;
-	_player.FloorSnapLength = 0.0f;  // disable auto-snap for the first frame
+		var plane = new Plane(_aimNormal, _aimOrigin.Dot(_aimNormal));
+		Vector3 startOnPlane = ProjectPointToPlane(_player.GlobalPosition, plane);
+		Vector3 newPos = startOnPlane + delta3D;
 
-	_player.GlobalPosition = safe;
+		_player.Velocity = Vector3.Zero;
+		_player.GlobalPosition = newPos;
 
-	// Optional: one-frame skip flag (set on player via metadata)
-	_player.SetMeta("justReturnedFromSlice", true);
+		if (_cam != null)
+			_cam.Current = true;
 
-	// Restore 3D view
-	if (_cam != null) _cam.Current = true;
-	_player.Visible = true;
+		_player.Visible = true;
 
-	GD.Print($"[SliceManager] Returned to 3D. Δ3D={delta3D}, snapped={safe}");
-}
-
-
-
-
-
-
-
-
+		GD.Print(
+			"[SliceManager DEBUG] Return mapping:\n" +
+			$"  DeadzonePixels = {DeadzonePixels}\n" +
+			$"  cleaned delta2D = {delta2D}\n" +
+			$"  delta3D   = {delta3D}\n" +
+			$"  startOnPlane = {startOnPlane}\n" +
+			$"  newPos    = {newPos}"
+		);
+		GD.Print($"[SliceManager] Returned to 3D. Δ3D={delta3D}, newPos={newPos}");
+	}
 
 	// ------------------------------------------------------------
 	// Helpers
@@ -512,7 +519,6 @@ private void OnSliceExit2D(Vector2 delta2D)
 
 	private static Vector3 BuildPlaneTangent(Vector3 n)
 	{
-		// pick an "up-ish" that isn't colinear
 		Vector3 up = MathF.Abs(n.Dot(Vector3.Up)) > 0.99f ? Vector3.Right : Vector3.Up;
 		return up.Cross(n).Normalized();
 	}
@@ -531,14 +537,16 @@ private void OnSliceExit2D(Vector2 delta2D)
 	{
 		if (pointsWorld == null || pointsWorld.Count < 3) return null;
 
-		// sort CCW in plane space around centroid
 		Vector3 n = plane.Normal.Normalized();
 		Vector3 t = BuildPlaneTangent(n);
 		Vector3 b = n.Cross(t);
-		Vector3 c = Vector3.Zero; foreach (var p in pointsWorld) c += p; c /= pointsWorld.Count;
+		Vector3 c = Vector3.Zero;
+		foreach (var p in pointsWorld) c += p;
+		c /= pointsWorld.Count;
 
 		var sorted = pointsWorld
-			.Select(p => {
+			.Select(p =>
+			{
 				Vector3 r = p - c;
 				float u = r.Dot(t);
 				float v = r.Dot(b);
@@ -561,11 +569,12 @@ private void OnSliceExit2D(Vector2 delta2D)
 			st.SetNormal(n); st.AddVertex(c2);
 		}
 
-		var cap = st.Commit();
-		if (cap == null) return null;
-		if (mat != null && cap.GetSurfaceCount() > 0) cap.SurfaceSetMaterial(0, mat);
+		var capMesh = st.Commit();
+		if (capMesh == null) return null;
+		if (mat != null && capMesh.GetSurfaceCount() > 0)
+			capMesh.SurfaceSetMaterial(0, mat);
 
-		return new MeshInstance3D { Mesh = cap };
+		return new MeshInstance3D { Mesh = capMesh };
 	}
 
 	private static Vector3 ProjectPointToPlane(Vector3 p, Plane plane)
@@ -582,235 +591,266 @@ private void OnSliceExit2D(Vector2 delta2D)
 		return new Vector2(u / SliceUnitsPerPixel, -v / SliceUnitsPerPixel);
 	}
 
-	private static List<Vector2> SortLoopCCW(List<Vector2> pts)
+	private void AutoDiscoverSliceTargetsFromGroup(string group = "sliceable")
 	{
-		if (pts == null || pts.Count < 3) return pts ?? new();
-		Vector2 c = Vector2.Zero; foreach (var p in pts) c += p; c /= pts.Count;
-		pts.Sort((a, b) =>
+		var list = new List<NodePath>();
+		foreach (var n in GetTree().GetNodesInGroup(group))
 		{
-			float aa = Mathf.Atan2(a.Y - c.Y, a.X - c.X);
-			float bb = Mathf.Atan2(b.Y - c.Y, b.X - c.X);
-			return aa.CompareTo(bb);
-		});
-		return pts;
+			if (n is MeshInstance3D mi && mi.Mesh != null)
+				list.Add(mi.GetPath());
+		}
+		if (list.Count > 0)
+			TargetMeshes = list.ToArray();
 	}
-	
-	private void AutoDiscoverSliceTargetsFromGroup(string group = "sliceable") {
-	var list = new System.Collections.Generic.List<NodePath>();
-	foreach (var n in GetTree().GetNodesInGroup(group)) {
-		if (n is MeshInstance3D mi && mi.Mesh != null)
-			list.Add(mi.GetPath());
-	}
-	if (list.Count > 0) TargetMeshes = list.ToArray();
-}
 
-private Vector3 FindSafeLanding(Vector3 target, float upNudge = 0.3f, float standClearance = 0.5f, float groundProbe = 3.0f)
-{
-	// 1) Nudge up a bit to avoid embedding in sloped/nearby geometry
-	Vector3 candidate = target + Vector3.Up * upNudge;
-
-	// 2) Raycast down to find the floor and standClearance above it
-	var space = GetWorld3D().DirectSpaceState;
-	var from  = candidate + Vector3.Up * groundProbe;
-	var to    = candidate + Vector3.Down * (groundProbe * 4f);
-
-	var q = PhysicsRayQueryParameters3D.Create(from, to);
-	q.CollideWithAreas = false;
-	q.CollideWithBodies = true;
-
-	var hit = space.IntersectRay(q);
-	if (hit.Count > 0 && hit.ContainsKey("position"))
+	private bool GetPolyYRange(List<List<Vector2>> polys, out float minY, out float maxY)
 	{
-		Vector3 floor = (Vector3)hit["position"];
-		return floor + Vector3.Up * standClearance;
-	}
+		minY = float.MaxValue;
+		maxY = float.MinValue;
+		if (polys == null || polys.Count == 0) return false;
 
-	// If no floor found, just return the up-nudged target
-	return candidate;
-}
-
-private Vector3 SnapToGround(Vector3 target, float up, float down, float upNudge)
-{
-	var space = GetWorld3D().DirectSpaceState;
-
-	// Downward ray (floor check)
-	Vector3 fromDown = target + Vector3.Up * 0.1f; // start slightly above target
-	Vector3 toDown   = target - Vector3.Up * down;
-	var qDown = PhysicsRayQueryParameters3D.Create(fromDown, toDown);
-	qDown.CollideWithAreas = false;
-	qDown.CollideWithBodies = true;
-	var hitDown = space.IntersectRay(qDown);
-
-	// Upward ray (roof check)
-	Vector3 fromUp = target - Vector3.Up * 0.1f;
-	Vector3 toUp   = target + Vector3.Up * up;
-	var qUp = PhysicsRayQueryParameters3D.Create(fromUp, toUp);
-	qUp.CollideWithAreas = false;
-	qUp.CollideWithBodies = true;
-	var hitUp = space.IntersectRay(qUp);
-
-
-
-	if (hitUp.Count > 0 && hitUp.ContainsKey("position"))
-	{
-		Vector3 roofPos = (Vector3)hitUp["position"];
-		// Move slightly below ceiling to avoid embedding
-		return roofPos - Vector3.Up * (upNudge * 2f);
-	}
-
-	// If we find a floor below the target -> use it
-
-
-	// If we're trapped in or below a ceiling (hit above, none below)
-
-	
-	GD.Print($"SnapToGround: targetY={target.Y} floorHit={(hitDown.Count>0)} roofHit={(hitUp.Count>0)}");
-
-
-	// No hits at all, keep position + gentle up nudge
-	return target + Vector3.Up * upNudge;
-}
-
-
-
-// Guess a reasonable half-height if you don't have it handy
-private float GetPlayerHalfHeight()
-{
-	// If you have a CollisionShape3D on the player, read its shape to be exact.
-	// Fallback to ~0.9m (a ~1.8m tall capsule/box).
-	return 0.9f;
-}
-
-// ---- 2D helpers for assembling loops & handling holes ----
-
-private static float Area2D(IReadOnlyList<Vector2> pts)
-{
-	if (pts == null || pts.Count < 3) return 0f;
-	double s = 0;
-	for (int i = 0; i < pts.Count; i++)
-	{
-		var a = pts[i];
-		var b = pts[(i + 1) % pts.Count];
-		s += (double)a.X * b.Y - (double)a.Y * b.X;
-	}
-	return (float)(0.5 * s);
-}
-
-// Small grid snap to merge nearly-equal vertices after projection.
-private static Vector2 Quantize(Vector2 p, float eps)
-{
-	float k = 1f / eps;
-	return new Vector2(Mathf.Round(p.X * k) / k, Mathf.Round(p.Y * k) / k);
-}
-
-// Greedy loop assembly from a bag of 2-point segments (already snapped).
-private static List<List<Vector2>> BuildLoopsFromSegments2D(List<(Vector2 A, Vector2 B)> segs, float eps = 0.25f)
-{
-	var loops = new List<List<Vector2>>();
-	if (segs == null || segs.Count == 0) return loops;
-
-	// Map endpoint -> list of outgoing segments indices
-	var byPoint = new Dictionary<Vector2, List<int>>();
-	var used = new bool[segs.Count];
-
-	for (int i = 0; i < segs.Count; i++)
-	{
-		var a = Quantize(segs[i].A, eps);
-		var b = Quantize(segs[i].B, eps);
-		segs[i] = (a, b);
-
-		if (!byPoint.TryGetValue(a, out var la)) { la = new List<int>(); byPoint[a] = la; }
-		if (!byPoint.TryGetValue(b, out var lb)) { lb = new List<int>(); byPoint[b] = lb; }
-		la.Add(i); lb.Add(i);
-	}
-
-	for (;;)
-	{
-		// pick an unused segment to start a loop
-		int start = -1;
-		for (int i = 0; i < segs.Count; i++) { if (!used[i]) { start = i; break; } }
-		if (start == -1) break;
-
-		var a0 = segs[start].A;
-		var b0 = segs[start].B;
-
-		var loop = new List<Vector2> { a0, b0 };
-		used[start] = true;
-
-		Vector2 curr = b0;
-		// walk forward until we close
-		while (!curr.IsEqualApprox(a0))
+		bool any = false;
+		foreach (var poly in polys)
 		{
-			if (!byPoint.TryGetValue(curr, out var cand)) break;
+			if (poly == null || poly.Count == 0) continue;
+			any = true;
+			foreach (var p in poly)
+			{
+				if (p.Y < minY) minY = p.Y;
+				if (p.Y > maxY) maxY = p.Y;
+			}
+		}
+		return any;
+	}
 
-			int pick = -1;
-			foreach (var idx in cand) if (!used[idx]) { pick = idx; break; }
-			if (pick == -1) break;
+	private bool TryRaycastRoomFloor(out Vector3 hitPos)
+	{
+		hitPos = Vector3.Zero;
+		if (_player == null) return false;
 
-			var s = segs[pick];
-			Vector2 next = s.A.IsEqualApprox(curr) ? s.B : s.A;
-			used[pick] = true;
-			curr = next;
+		var space = GetWorld3D().DirectSpaceState;
+		Vector3 from = _player.GlobalPosition + Vector3.Up * 0.5f;
+		Vector3 to = _player.GlobalPosition + Vector3.Down * 30f;
 
-			// avoid duplicate last vertex
-			if (!curr.IsEqualApprox(loop[^1]))
-				loop.Add(curr);
+		var q = PhysicsRayQueryParameters3D.Create(from, to);
+		q.CollideWithAreas = false;
+		q.CollideWithBodies = true;
+		// Optionally set q.CollisionMask to limit to floor layer(s)
 
-			// guard against bad data
-			if (loop.Count > 4096) break;
+		var hit = space.IntersectRay(q);
+		if (hit.Count == 0 || !hit.ContainsKey("position"))
+			return false;
+
+		hitPos = (Vector3)hit["position"];
+		return true;
+	}
+
+	// ---------- 2D loop & hole helpers ----------
+
+	private static float Area2D(IReadOnlyList<Vector2> pts)
+	{
+		if (pts == null || pts.Count < 3) return 0f;
+		double s = 0;
+		for (int i = 0; i < pts.Count; i++)
+		{
+			var a = pts[i];
+			var b = pts[(i + 1) % pts.Count];
+			s += (double)a.X * b.Y - (double)a.Y * b.X;
+		}
+		return (float)(0.5 * s);
+	}
+
+	private static Vector2 Quantize(Vector2 p, float eps)
+	{
+		float k = 1f / eps;
+		return new Vector2(Mathf.Round(p.X * k) / k, Mathf.Round(p.Y * k) / k);
+	}
+
+	/// <summary>
+	/// Greedy assembly of closed loops from 2-point line segments in 2D.
+	/// Assumes endpoints are already snapped via Quantize.
+	/// </summary>
+	private static List<List<Vector2>> BuildLoopsFromSegments2D(List<(Vector2 A, Vector2 B)> segs, float eps = 0.25f)
+	{
+		var loops = new List<List<Vector2>>();
+		if (segs == null || segs.Count == 0) return loops;
+
+		var byPoint = new Dictionary<Vector2, List<int>>();
+		var used = new bool[segs.Count];
+
+		for (int i = 0; i < segs.Count; i++)
+		{
+			var a = Quantize(segs[i].A, eps);
+			var b = Quantize(segs[i].B, eps);
+			segs[i] = (a, b);
+
+			if (!byPoint.TryGetValue(a, out var la)) { la = new List<int>(); byPoint[a] = la; }
+			if (!byPoint.TryGetValue(b, out var lb)) { lb = new List<int>(); byPoint[b] = lb; }
+			la.Add(i);
+			lb.Add(i);
 		}
 
-		// only accept proper loop
-		if (loop.Count >= 3 && loop[0].IsEqualApprox(loop[^1]) == false && loop[0].IsEqualApprox(loop[^1]) == false)
+		for (;;)
 		{
-			// If it didn’t return exactly to a0 (tiny drift), snap it:
-			if (!curr.IsEqualApprox(a0))
-				loop.Add(a0);
+			int start = -1;
+			for (int i = 0; i < segs.Count; i++)
+			{
+				if (!used[i]) { start = i; break; }
+			}
+			if (start == -1) break;
+
+			var a0 = segs[start].A;
+			var b0 = segs[start].B;
+
+			var loop = new List<Vector2> { a0, b0 };
+			used[start] = true;
+
+			Vector2 curr = b0;
+			while (!curr.IsEqualApprox(a0))
+			{
+				if (!byPoint.TryGetValue(curr, out var cand)) break;
+
+				int pick = -1;
+				foreach (var idx in cand)
+					if (!used[idx]) { pick = idx; break; }
+				if (pick == -1) break;
+
+				var s = segs[pick];
+				Vector2 next = s.A.IsEqualApprox(curr) ? s.B : s.A;
+				used[pick] = true;
+				curr = next;
+
+				if (!curr.IsEqualApprox(loop[^1]))
+					loop.Add(curr);
+
+				if (loop.Count > 4096) break;
+			}
+
+			if (loop.Count >= 3)
+			{
+				if (!curr.IsEqualApprox(a0))
+					loop.Add(a0);
+				loops.Add(loop);
+			}
 		}
 
-		// basic de-dup
-		if (loop.Count >= 3) loops.Add(loop);
+		return loops;
 	}
 
-	return loops;
-}
-
-// Simple point-in-polygon for containment test (even-odd).
-private static bool PointInPoly(Vector2 p, IReadOnlyList<Vector2> poly)
-{
-	bool inside = false;
-	for (int i = 0, j = poly.Count - 1; i < poly.Count; j = i++)
+	private static bool PointInPoly(Vector2 p, IReadOnlyList<Vector2> poly)
 	{
-		var a = poly[i]; var b = poly[j];
-		bool intersect = ((a.Y > p.Y) != (b.Y > p.Y)) &&
-						 (p.X < (b.X - a.X) * (p.Y - a.Y) / (b.Y - a.Y + 1e-20f) + a.X);
-		if (intersect) inside = !inside;
-	}
-	return inside;
-}
-
-// Subtract all holes that lie inside an outer polygon using Geometry2D.ClipPolygons.
-private static List<Vector2[]> SubtractHoles(Vector2[] outer, List<Vector2[]> holes)
-{
-	// Godot expects CW/CCW consistently. For ClipPolygons you can feed outer as given,
-	// it returns an Array<Vector2[]> of resulting simple polygons.
-	var solids = new List<Vector2[]>() { outer };
-
-	foreach (var h in holes)
-	{
-		var next = new List<Vector2[]>();
-		foreach (var s in solids)
+		bool inside = false;
+		for (int i = 0, j = poly.Count - 1; i < poly.Count; j = i++)
 		{
-			var arr = Geometry2D.ClipPolygons(s, h); // subtract h from s
-			if (arr != null && arr.Count > 0)
-				next.AddRange(arr);
+			var a = poly[i]; var b = poly[j];
+			bool intersect =
+				((a.Y > p.Y) != (b.Y > p.Y)) &&
+				(p.X < (b.X - a.X) * (p.Y - a.Y) / (b.Y - a.Y + 1e-20f) + a.X);
+			if (intersect) inside = !inside;
 		}
-		solids = next;
-		if (solids.Count == 0) break;
+		return inside;
 	}
-	return solids;
-}
 
+	private static List<Vector2[]> SubtractHoles(Vector2[] outer, List<Vector2[]> holes)
+	{
+		var solids = new List<Vector2[]> { outer };
 
+		foreach (var h in holes)
+		{
+			var next = new List<Vector2[]>();
+			foreach (var s in solids)
+			{
+				var arr = Geometry2D.ClipPolygons(s, h);
+				if (arr != null && arr.Count > 0)
+					next.AddRange(arr);
+			}
+			solids = next;
+			if (solids.Count == 0) break;
+		}
+		return solids;
+	}
 
+	private static List<List<Vector2>> BuildSolidPolygonsFromLoops(List<List<Vector2>> loops)
+	{
+		if (loops == null || loops.Count == 0)
+			return new List<List<Vector2>>();
+
+		// Normalize orientation (CCW) and sort by area
+		var normalized = new List<(List<Vector2> poly, int idx, float area)>();
+		for (int i = 0; i < loops.Count; i++)
+		{
+			var poly = loops[i];
+			if (poly == null || poly.Count < 3) continue;
+
+			// Copy so we can safely reverse
+			var clean = new List<Vector2>(poly);
+			float area = Area2D(clean);
+			if (area < 0f)
+			{
+				clean.Reverse();
+				area = -area;
+			}
+			normalized.Add((clean, i, area));
+		}
+
+		normalized = normalized
+			.OrderByDescending(x => x.area)
+			.ToList();
+
+		var outers = normalized.Select(x => x.poly).ToList();
+		var holeBuckets = new Dictionary<int, List<Vector2[]>>();
+
+		// For each smaller loop, if centroid lies inside a bigger one, treat as a hole
+		for (int i = 0; i < normalized.Count; i++)
+		{
+			var (polyI, idxI, areaI) = normalized[i];
+
+			// Compute centroid
+			Vector2 centroid = Vector2.Zero;
+			foreach (var p in polyI) centroid += p;
+			centroid /= polyI.Count;
+
+			for (int j = 0; j < normalized.Count; j++)
+			{
+				if (i == j) continue;
+				var (polyJ, idxJ, areaJ) = normalized[j];
+				if (areaJ <= areaI) continue; // only consider bigger candidates
+
+				if (PointInPoly(centroid, polyJ))
+				{
+					if (!holeBuckets.TryGetValue(idxJ, out var list))
+					{
+						list = new List<Vector2[]>();
+						holeBuckets[idxJ] = list;
+					}
+					list.Add(polyI.ToArray());
+					break;
+				}
+			}
+		}
+
+		var finalPolys = new List<List<Vector2>>();
+
+		foreach (var (poly, idx, _) in normalized)
+		{
+			if (!holeBuckets.TryGetValue(idx, out var holes))
+			{
+				// No holes → just add as a solid
+				finalPolys.Add(poly);
+				continue;
+			}
+
+			var solids = SubtractHoles(poly.ToArray(), holes);
+			foreach (var s in solids)
+			{
+				if (s != null && s.Length >= 3)
+					finalPolys.Add(new List<Vector2>(s));
+			}
+		}
+
+		if (finalPolys.Count == 0)
+			finalPolys = loops; // fallback
+
+		return finalPolys;
+	}
 }

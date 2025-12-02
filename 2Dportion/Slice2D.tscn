@@ -6,10 +6,10 @@
 
 [node name="Slice2D" type="Node2D"]
 script = ExtResource("1_587wl")
+CameraZoom = 0.1
 MoveSpeed = 180.0
 JumpForce = 280.0
 Gravity = 600.0
-FloorLiftPx = 60.0
 metadata/_edit_vertical_guides_ = [-12548.0]
 
 [node name="World" type="Node2D" parent="."]
