@@ -27,6 +27,10 @@ public partial class SliceLevel2D : Node2D
 	[Export] public bool EnableDebugCam = true;
 	[Export] public bool DrawAabbDebug = true;
 	[Export] public bool DrawPolyOutlines = true;
+	
+	[ExportGroup("Player Spawn Offsets")]
+// how many pixels between the player's center and their feet
+	[Export] public float CenterToFeetOffsetPx = 12f;
 
 	// ---------------- Data from SliceManager ----------------
 	// These are filled in by SliceManager before adding this node to the scene.
@@ -89,8 +93,21 @@ public partial class SliceLevel2D : Node2D
 		// We trust SliceManager to provide a sensible PlayerStart2D.
 		// Convert from slice units to pixels.
 		Vector2 spawnPx = PlayerStart2D * Scale2D;
-		_player.GlobalPosition = spawnPx;
-		_startPosPx = spawnPx;
+
+// move the player UP by their center→feet distance
+spawnPx.Y -= CenterToFeetOffsetPx;
+
+_player.Position = spawnPx;
+_startPosPx = spawnPx;
+
+// Safe reset of motion — only if your Player2D has a Velocity property
+if (_player.HasMethod("set_Velocity"))
+{
+	_player.Set("Velocity", Vector2.Zero);
+}
+
+GD.Print($"[Slice2D] Raw spawn px={PlayerStart2D * Scale2D}, adjusted spawn px={spawnPx} " +
+		 $"(CenterToFeetOffsetPx={CenterToFeetOffsetPx})");
 
 		GD.Print($"[Slice2D] Raw spawn px={spawnPx} (PlayerStart2D={PlayerStart2D}, Scale2D={Scale2D})");
 
