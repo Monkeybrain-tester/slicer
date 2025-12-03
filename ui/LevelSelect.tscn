@@ -1,8 +1,7 @@
-[gd_scene load_steps=5 format=3 uid="uid://bc5y7182wpq7"]
+[gd_scene load_steps=4 format=3 uid="uid://bc5y7182wpq7"]
 
-[ext_resource type="Shader" uid="uid://da4y0v5w5ytyn" path="res://UI/MainMenu.gdshader" id="1_4h3ul"]
-[ext_resource type="Script" path="res://UI/LevelSelect.cs" id="1_deyjv"]
-[ext_resource type="Theme" uid="uid://2p3p8i8xyx8y" path="res://Levels/slicertheme.tres" id="2_deyjv"]
+[ext_resource type="Shader" uid="uid://da4y0v5w5ytyn" path="res://ui/MainMenu.gdshader" id="1_4h3ul"]
+[ext_resource type="Theme" uid="uid://2p3p8i8xyx8y" path="res://levels/slicertheme.tres" id="2_deyjv"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_fjtf3"]
 shader = ExtResource("1_4h3ul")
@@ -14,8 +13,6 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-script = ExtResource("1_deyjv")
-TotalLevels = null
 
 [node name="MarginContainer" type="MarginContainer" parent="."]
 layout_mode = 0

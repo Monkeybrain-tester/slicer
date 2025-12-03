@@ -1,8 +1,7 @@
-[gd_scene load_steps=5 format=3 uid="uid://v5262hsv0sbp"]
+[gd_scene load_steps=4 format=3 uid="uid://v5262hsv0sbp"]
 
-[ext_resource type="Shader" uid="uid://da4y0v5w5ytyn" path="res://UI/MainMenu.gdshader" id="1_2f007"]
-[ext_resource type="Script" path="res://UI/MainMenu.cs" id="1_2k6u6"]
-[ext_resource type="Theme" uid="uid://2p3p8i8xyx8y" path="res://Levels/slicertheme.tres" id="2_fjm0h"]
+[ext_resource type="Shader" uid="uid://da4y0v5w5ytyn" path="res://ui/MainMenu.gdshader" id="1_2f007"]
+[ext_resource type="Theme" uid="uid://2p3p8i8xyx8y" path="res://levels/slicertheme.tres" id="2_fjm0h"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_hgbpw"]
 shader = ExtResource("1_2f007")
@@ -12,7 +11,6 @@ modulate = Color(0.941176, 0.67451, 0.956863, 1)
 layout_mode = 3
 anchors_preset = 0
 size_flags_horizontal = 4
-script = ExtResource("1_2k6u6")
 
 [node name="MarginContainer" type="MarginContainer" parent="."]
 layout_mode = 1

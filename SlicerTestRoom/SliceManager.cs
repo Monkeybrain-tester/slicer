@@ -412,6 +412,10 @@ private void ExecuteSlice()
 	// ------------------------------------------------------------
 	private void LaunchSlice2D(List<List<Vector2>> polygons2D, List<Vector2[]> segments2D)
 	{
+		
+			GD.Print($"[SliceManager DEBUG] LaunchSlice2D: path = {Slice2DScenePath}");
+
+		
 		var scene = GD.Load<PackedScene>(Slice2DScenePath);
 		if (scene == null)
 		{
