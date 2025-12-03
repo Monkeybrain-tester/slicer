@@ -777,21 +777,27 @@ states/running/position = Vector2(200, 264)
 states/skid/node = SubResource("AnimationNodeAnimation_jsr5u")
 states/skid/position = Vector2(175, 187.847)
 states/stop_pushing/node = SubResource("AnimationNodeAnimation_3jf0j")
-states/stop_pushing/position = Vector2(573, 351)
+states/stop_pushing/position = Vector2(573, 356)
 states/takeoff/node = SubResource("AnimationNodeAnimation_mkkhc")
 states/takeoff/position = Vector2(272, 374)
 transitions = ["Start", "idle", SubResource("AnimationNodeStateMachineTransition_w0kn8"), "idle", "takeoff", SubResource("AnimationNodeStateMachineTransition_dskx2"), "takeoff", "running", SubResource("AnimationNodeStateMachineTransition_ludg5"), "falling", "landing", SubResource("AnimationNodeStateMachineTransition_u8p8n"), "landing", "takeoff", SubResource("AnimationNodeStateMachineTransition_d3qiv"), "landing", "idle", SubResource("AnimationNodeStateMachineTransition_ngkyo"), "jump", "falling_init", SubResource("AnimationNodeStateMachineTransition_83dn1"), "falling_init", "falling", SubResource("AnimationNodeStateMachineTransition_frw8n"), "landing", "running", SubResource("AnimationNodeStateMachineTransition_rse16"), "running", "skid", SubResource("AnimationNodeStateMachineTransition_ytnpj"), "skid", "idle", SubResource("AnimationNodeStateMachineTransition_0bfwg"), "idle", "jump", SubResource("AnimationNodeStateMachineTransition_6cemo"), "skid", "jump", SubResource("AnimationNodeStateMachineTransition_ggjus"), "skid", "falling_init", SubResource("AnimationNodeStateMachineTransition_f2h6o"), "idle", "falling_init", SubResource("AnimationNodeStateMachineTransition_bbmhn"), "running", "falling_init", SubResource("AnimationNodeStateMachineTransition_mkkhc"), "takeoff", "falling_init", SubResource("AnimationNodeStateMachineTransition_jsr5u"), "takeoff", "push", SubResource("AnimationNodeStateMachineTransition_vmc8r"), "running", "push", SubResource("AnimationNodeStateMachineTransition_r3ktn"), "push", "stop_pushing", SubResource("AnimationNodeStateMachineTransition_3e6ck"), "stop_pushing", "idle", SubResource("AnimationNodeStateMachineTransition_g45j2")]
-graph_offset = Vector2(-91, 25.8474)
+graph_offset = Vector2(-91, 18.2919)
 
 [node name="Player" type="CharacterBody2D"]
 process_mode = 3
-scale = Vector2(0.393316, 0.380134)
+scale = Vector2(0.393316, 0.386808)
 disable_mode = 2
 collision_layer = 2
 input_pickable = true
 floor_max_angle = 0.610865
 safe_margin = 0.1
 script = ExtResource("1_btncp")
+MoveSpeed = 700.0
+JumpVelocity = 1100.0
+_gravity = 2500.0
+Acceleration = 2500.0
+LowJumpMultiplier = 0.3
+Friction = 4000.0
 
 [node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="."]
 position = Vector2(0, -209.885)

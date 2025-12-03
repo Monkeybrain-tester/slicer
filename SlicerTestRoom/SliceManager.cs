@@ -411,44 +411,68 @@ private void ExecuteSlice()
 	// 2D scene launch / return
 	// ------------------------------------------------------------
 	private void LaunchSlice2D(List<List<Vector2>> polygons2D, List<Vector2[]> segments2D)
+{
+	GD.Print("[SliceManager DEBUG] LaunchSlice2D: path = ", Slice2DScenePath);
+
+	// --- Safety checks ---
+	if (_player == null)
 	{
-		
-			GD.Print($"[SliceManager DEBUG] LaunchSlice2D: path = {Slice2DScenePath}");
-
-		
-		var scene = GD.Load<PackedScene>(Slice2DScenePath);
-		if (scene == null)
-		{
-			GD.PushError($"[SliceManager] Cannot load 2D scene: {Slice2DScenePath}");
-			return;
-		}
-
-		var slice = scene.Instantiate<Node2D>() as Node2D;
-		if (slice is not SliceLevel2D level)
-		{
-			GD.PushError("Slice2D.tscn root must have SliceLevel2D.cs attached.");
-			return;
-		}
-		
-		 // turn off 3D camera while in 2D
-		if (_cam != null) _cam.Current = false;  
-
-
-		// pack data
-		level.Polygons2D = polygons2D ?? new();
-		level.Segments2D = segments2D ?? new();
-
-		// player start in 2D = projection of current 3D player onto plane
-		Vector3 projected = ProjectPointToPlane(_player.GlobalPosition, new Plane(_aimNormal, _aimOrigin.Dot(_aimNormal)));
-		Vector2 start2D   = ProjectWorldTo2D(projected);
-		level.PlayerStart2D = start2D;
-
-		// add + connect
-		GetTree().CurrentScene.AddChild(level);
-		if (_player != null) _player.Visible = false;
-
-		level.Connect(SliceLevel2D.SignalName.SliceExit, new Callable(this, nameof(OnSliceExit2D)));
+		GD.PushError("[SliceManager ERROR] _player is null in LaunchSlice2D. Did you assign PlayerPath to your Player1 node in the inspector?");
+		return;
 	}
+
+	var scene = GD.Load<PackedScene>(Slice2DScenePath);
+	if (scene == null)
+	{
+		GD.PushError($"[SliceManager ERROR] Cannot load 2D slice scene at '{Slice2DScenePath}'.");
+		return;
+	}
+
+	var instance = scene.Instantiate();
+	if (instance is not SliceLevel2D level)
+	{
+		GD.PushError("[SliceManager ERROR] Root of Slice2D.tscn is not SliceLevel2D. Check the script on the root Node2D.");
+		return;
+	}
+
+	// Turn off 3D camera while in 2D
+	if (_cam != null)
+		_cam.Current = false;
+
+	// Pack 2D geometry
+	level.Polygons2D = polygons2D ?? new();
+	level.Segments2D = segments2D ?? new();
+
+	// --- Compute player start in slice-space ---
+	// Plane is defined by the aim normal and origin we captured earlier
+	Plane plane = new Plane(_aimNormal, _aimOrigin.Dot(_aimNormal));
+	Vector3 playerPos3D = _player.GlobalPosition;
+	Vector3 projected = ProjectPointToPlane(playerPos3D, plane);
+	Vector2 start2D = ProjectWorldTo2D(projected);
+
+	level.PlayerStart2D = start2D;
+
+	GD.Print($"[SliceManager DEBUG] PlayerStart2D={start2D}");
+
+	// --- Add the 2D level to the tree ---
+	Node rootFor2D = GetTree().CurrentScene ?? GetTree().Root;
+	if (rootFor2D == null)
+	{
+		GD.PushError("[SliceManager ERROR] No valid scene root to add SliceLevel2D to.");
+		return;
+	}
+
+	rootFor2D.AddChild(level);
+
+	// Hide / freeze the 3D player while in 2D
+	_player.Visible = false;
+	if (_player is Player1 p1)
+		p1.FreezeMotion(true);
+
+	// Connect the exit signal so we can map the movement back to 3D
+	level.Connect(SliceLevel2D.SignalName.SliceExit, new Callable(this, nameof(OnSliceExit2D)));
+}
+
 	
 private void OnSliceExit2D(Vector2 delta2D)
 {

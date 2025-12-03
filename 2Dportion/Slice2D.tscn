@@ -6,8 +6,12 @@
 [node name="Slice2D" type="Node2D"]
 scale = Vector2(0.8, 1)
 script = ExtResource("1_587wl")
-CameraZoom = 0.1
+Scale2D = 1.5
+CameraZoom = 0.4
 Player2DScene = ExtResource("2_jtocm")
+EnableDebugCam = false
+DrawAabbDebug = false
+DrawPolyOutlines = false
 metadata/_edit_vertical_guides_ = [-12548.0]
 
 [node name="World" type="Node2D" parent="."]
@@ -18,6 +22,3 @@ metadata/_edit_vertical_guides_ = [-12548.0]
 offset_right = 40.0
 offset_bottom = 23.0
 scale = Vector2(1, 1.01759)
-
-[node name="Player" parent="." instance=ExtResource("2_jtocm")]
-scale = Vector2(0.127177, 0.106798)
