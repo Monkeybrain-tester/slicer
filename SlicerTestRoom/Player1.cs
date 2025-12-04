@@ -135,9 +135,9 @@ public partial class Player1 : CharacterBody3D
 			if (_cam != null)
 				_cam.RotationDegrees = new Vector3(_pitchDeg, 0f, 0f);
 		}
-
-		if (e is InputEventKey key && key.Pressed && key.Keycode == Key.Escape)
-			Input.MouseMode = Input.MouseModeEnum.Visible;
+		//This WOULD unlock the camera on escape, I'm using the escape key for a level menu now
+		//if (e is InputEventKey key && key.Pressed && key.Keycode == Key.Escape)
+			//Input.MouseMode = Input.MouseModeEnum.Visible;
 	}
 
 	// ===============================
@@ -149,15 +149,21 @@ public partial class Player1 : CharacterBody3D
 		float dt = (float)delta;
 
 		if (!ControlsEnabled)
-			return;
+{
+	// allow an automatic unfreeze if we detect grounded again
+	if (IsOnFloor())
+		ControlsEnabled = true;
+	else
+		return;
+}
 
-		// After returning from slice, skip one frame of physics so we don't “pop” down
-		if (HasMeta("justReturnedFromSlice") && (bool)GetMeta("justReturnedFromSlice"))
-		{
-			SetMeta("justReturnedFromSlice", false);
-			Velocity = new Vector3(Velocity.X, 0f, Velocity.Z);
-			return;
-		}
+if (HasMeta("justReturnedFromSlice") && (bool)GetMeta("justReturnedFromSlice"))
+{
+	GD.Print("[Player1] Returning from Slice — skipping one frame.");
+	SetMeta("justReturnedFromSlice", false);
+	return;
+}
+
 
 		// Use our custom grounded state from the *previous* frame
 		bool onFloor = _isGrounded;

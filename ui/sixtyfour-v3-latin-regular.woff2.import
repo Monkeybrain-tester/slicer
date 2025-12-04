@@ -2,13 +2,13 @@
 
 importer="font_data_dynamic"
 type="FontFile"
-uid="uid://0jw60r1okg2"
-path="res://.godot/imported/Sixtyfour-Regular-VariableFont_BLED,SCAN.ttf-f8584d7786ec4aeeb8b88acefae917fe.fontdata"
+uid="uid://bfq05xd1j4idr"
+path="res://.godot/imported/sixtyfour-v3-latin-regular.woff2-431435c867e60c1c6ee109ce9fc5ed36.fontdata"
 
 [deps]
 
-source_file="res://ui/Sixtyfour-Regular-VariableFont_BLED,SCAN.ttf"
-dest_files=["res://.godot/imported/Sixtyfour-Regular-VariableFont_BLED,SCAN.ttf-f8584d7786ec4aeeb8b88acefae917fe.fontdata"]
+source_file="res://ui/sixtyfour-v3-latin-regular.woff2"
+dest_files=["res://.godot/imported/sixtyfour-v3-latin-regular.woff2-431435c867e60c1c6ee109ce9fc5ed36.fontdata"]
 
 [params]
 

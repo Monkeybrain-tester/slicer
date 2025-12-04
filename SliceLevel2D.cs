@@ -28,6 +28,11 @@ public partial class SliceLevel2D : Node2D
 	[Export] public bool DrawAabbDebug = true;
 	[Export] public bool DrawPolyOutlines = true;
 	
+	[ExportGroup("Background")]
+	[Export] public NodePath BackgroundRectPath;   // ColorRect with your shader
+	[Export] public float BackgroundOversize = 800f; // how much bigger than viewport
+
+	
 	[ExportGroup("Player Spawn Offsets")]
 // how many pixels between the player's center and their feet
 	[Export] public float CenterToFeetOffsetPx = 12f;
@@ -44,6 +49,7 @@ public partial class SliceLevel2D : Node2D
 	private Vector2 _startPosPx; // starting position in pixels (for delta2D)
 	private bool _debugMode = false;
 
+
 	public override void _Ready()
 	{
 		// ---------------- World / geometry ----------------
@@ -58,6 +64,8 @@ public partial class SliceLevel2D : Node2D
 		DrawCrossSectionGeometry(world);
 		if (DrawAabbDebug)
 			DrawAabbDebugRects(world);
+			
+		SetupBackground();   
 
 		// ---------------- Player instantiation ----------------
 		if (Player2DScene != null)
@@ -377,4 +385,29 @@ GD.Print($"[Slice2D] Raw spawn px={PlayerStart2D * Scale2D}, adjusted spawn px={
 
 		GD.Print(_debugMode ? "[Slice2D] Free-cam enabled." : "[Slice2D] Free-cam disabled.");
 	}
+private void SetupBackground()
+{
+	if (BackgroundRectPath == null || BackgroundRectPath.IsEmpty)
+		return;
+
+	var rect = GetNodeOrNull<ColorRect>(BackgroundRectPath);
+	if (rect == null)
+		return;
+
+	// Get viewport rect in local coordinates
+	var vp = GetViewportRect();
+
+	// Make the background larger than the viewport so edges never show.
+	Vector2 extra = new Vector2(BackgroundOversize, BackgroundOversize);
+	Vector2 size  = vp.Size + extra * 2f;
+
+	// Position it so it fully covers and extends past the viewport.
+	// This assumes your SliceLevel2D origin is (0,0) in the same space as the ColorRect.
+	rect.Position = vp.Position - extra;
+	rect.Size     = size;
+
+	GD.Print($"[Slice2D BG] BackgroundRect sized pos={rect.Position}, size={rect.Size}");
+}
+
+
 }

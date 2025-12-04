@@ -503,6 +503,11 @@ private void OnSliceExit2D(Vector2 delta2D)
 
 	// Optional: one-frame skip flag (set on player via metadata)
 	_player.SetMeta("justReturnedFromSlice", true);
+	
+	
+	_player.Velocity = Vector3.Zero; // optional safety
+	_player.SetMeta("justReturnedFromSlice", false);
+
 
 	// Restore 3D view
 	if (_cam != null) _cam.Current = true;

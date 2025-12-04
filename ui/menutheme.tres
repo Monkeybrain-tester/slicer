@@ -1,0 +1,17 @@
+[gd_resource type="Theme" load_steps=3 format=3 uid="uid://c8ir5ii6yvpnd"]
+
+[ext_resource type="FontFile" uid="uid://bfq05xd1j4idr" path="res://ui/sixtyfour-v3-latin-regular.woff2" id="1_unpab"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_unpab"]
+bg_color = Color(0.87, 0.3741, 0.812145, 0.513726)
+border_width_left = 3
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 3
+border_color = Color(0.734239, 0.180742, 0.524442, 1)
+
+[resource]
+default_font = ExtResource("1_unpab")
+default_font_size = 50
+Button/colors/font_color = Color(0.870588, 0.372549, 0.811765, 1)
+Button/styles/disabled = SubResource("StyleBoxFlat_unpab")

@@ -1,22 +1,13 @@
-[gd_scene load_steps=38 format=4 uid="uid://bpl8a5o4h6gqf"]
+[gd_scene load_steps=40 format=4 uid="uid://bmvpcyih6cmst"]
 
-[ext_resource type="Script" uid="uid://cdvglavl4o7yc" path="res://Levels/LevelRoot.cs" id="1_302sc"]
+[ext_resource type="Script" uid="uid://cdvglavl4o7yc" path="res://levels/LevelRoot.cs" id="1_302sc"]
 [ext_resource type="Script" uid="uid://dxn0hktjcsl30" path="res://SlicerTestRoom/Player1.cs" id="2_aunfx"]
 [ext_resource type="Script" uid="uid://onc4krrl3yo4" path="res://SlicerTestRoom/SliceManager.cs" id="3_j32wv"]
 [ext_resource type="Texture2D" uid="uid://b0hdg7n3mnv06" path="res://art/dashed_purple.png" id="4_nq5j5"]
-[ext_resource type="Material" uid="uid://cb4tpirh2ecfs" path="res://Levels/testmaterial.tres" id="5_utqd4"]
+[ext_resource type="Material" uid="uid://cb4tpirh2ecfs" path="res://levels/testmaterial.tres" id="5_utqd4"]
 [ext_resource type="Script" uid="uid://d18c1iaaxje2k" path="res://SlicerTestRoom/CrosshairHud.cs" id="6_u55on"]
-
-[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_vqhxe"]
-radius = 0.125619
-height = 0.598841
-
-[sub_resource type="CapsuleMesh" id="CapsuleMesh_j0xkf"]
-
-[sub_resource type="Skin" id="Skin_hvpbc"]
-
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_u1sot"]
-albedo_color = Color(0.330089, 1, 0.879478, 1)
+[ext_resource type="PackedScene" uid="uid://dxdac0ujf8gh2" path="res://levels/WinObject.tscn" id="7_045es"]
+[ext_resource type="PackedScene" uid="uid://dg6wertqyj3o8" path="res://ui/LevelPauseMenu.tscn" id="9_omn1t"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_3tyf1"]
 albedo_color = Color(0.882353, 1, 0, 1)
@@ -151,32 +142,23 @@ emission = Color(0.947993, 0.960314, 0.968271, 1)
 emission_energy_multiplier = 8.35
 emission_on_uv2 = true
 
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_pdpul"]
+radius = 0.426269
+height = 1.91089
+
+[sub_resource type="CapsuleMesh" id="CapsuleMesh_8hd6v"]
+
+[sub_resource type="Skin" id="Skin_045es"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_omn1t"]
+albedo_color = Color(0.330089, 1, 0.879478, 1)
+
 [node name="LevelTemplate" type="Node3D"]
 script = ExtResource("1_302sc")
 PlayerPath = NodePath("")
 SpawnPath = NodePath("")
 
 [node name="WorldEnv" type="WorldEnvironment" parent="."]
-
-[node name="Player1" type="CharacterBody3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 29.6183, -10.4406, -2.99395)
-script = ExtResource("2_aunfx")
-CameraPath = NodePath("Camera3D")
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Player1"]
-transform = Transform3D(3.79462, 0, 0, 0, 2.93138, 0.0365789, 0, -0.0259399, 4.13366, -0.177835, 37.3874, -0.101573)
-shape = SubResource("CapsuleShape3D_vqhxe")
-debug_color = Color(0.173874, 0.552506, 0.878015, 0.42)
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Player1"]
-transform = Transform3D(1, 0, 0, 0, 1.05382, 0, 0, 0, 1, 0, 37.2874, 0)
-mesh = SubResource("CapsuleMesh_j0xkf")
-skin = SubResource("Skin_hvpbc")
-surface_material_override/0 = SubResource("StandardMaterial3D_u1sot")
-
-[node name="Camera3D" type="Camera3D" parent="Player1"]
-transform = Transform3D(1, -8.74228e-08, 0, 8.74228e-08, 1, 0, 0, 0, -1, -0.0278088, 37.7751, 0.0130397)
-current = true
 
 [node name="SliceManager" type="Node3D" parent="."]
 transform = Transform3D(0.835381, 0, 0, 0, 0.835381, 0, 0, 0, 0.835381, -1.95724, -36.8078, 1.27912)
@@ -448,3 +430,38 @@ light_specular = 8.829
 omni_range = 4096.0
 omni_attenuation = 2.065
 omni_shadow_mode = 0
+
+[node name="Player1" type="CharacterBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 30.0943, 3.20828, 5.76696)
+script = ExtResource("2_aunfx")
+CameraPath = NodePath("Camera3D")
+WalkSpeed = 30.0
+SprintSpeed = 50.0
+GroundAcceleration = 50.0
+AirAcceleration = 5.0
+GroundFriction = 4000.0
+AirControl = 0.5
+MaxSlopeAngleDegrees = 60.0
+MaxFallSpeed = 80.0
+JumpVelocity = 8.0
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Player1"]
+transform = Transform3D(1, 0, 0, 0, 0.999961, 0.0088487, 0, -0.0088487, 0.999961, 0.0123844, 0.0776062, -0.101573)
+shape = SubResource("CapsuleShape3D_pdpul")
+debug_color = Color(0.173874, 0.552506, 0.878015, 0.42)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Player1"]
+transform = Transform3D(1, 0, 0, 0, 1.05382, 0, 0, 0, 1, 0, 0.168858, 0)
+mesh = SubResource("CapsuleMesh_8hd6v")
+skin = SubResource("Skin_045es")
+surface_material_override/0 = SubResource("StandardMaterial3D_omn1t")
+
+[node name="Camera3D" type="Camera3D" parent="Player1"]
+transform = Transform3D(1, -8.74228e-08, 0, 8.74228e-08, 1, 0, 0, 0, -1, -0.0278087, 0.656559, 0.0130396)
+current = true
+
+[node name="WinObject" parent="." instance=ExtResource("7_045es")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -24.2046, 0.607145, 0)
+
+[node name="LevelPauseMenu" parent="." instance=ExtResource("9_omn1t")]
+PlayerPath = NodePath("../Player1")
