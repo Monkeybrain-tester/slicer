@@ -6,11 +6,11 @@
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_su48r"]
 shader = ExtResource("3_qobs4")
-shader_parameter/loop_time = 8.0
-shader_parameter/pattern_scale = 1.2
-shader_parameter/wave_amplitude = 0.15
-shader_parameter/wave_frequency = 4.0
-shader_parameter/pixel_resolution = 59.355
+shader_parameter/loop_time = 30.0
+shader_parameter/pattern_scale = 5.0
+shader_parameter/wave_amplitude = 0.5
+shader_parameter/wave_frequency = 3.273
+shader_parameter/pixel_resolution = 512.0
 shader_parameter/color_steps = 6
 shader_parameter/color_a = Color(0.03, 0, 0.08, 1)
 shader_parameter/color_b = Color(0.4, 0.15, 0.7, 1)
@@ -18,7 +18,6 @@ shader_parameter/color_c = Color(0.95, 0.7, 1, 1)
 
 [node name="Slice2D" type="Node2D"]
 position = Vector2(1, 0)
-scale = Vector2(0.8, 1)
 script = ExtResource("1_587wl")
 Scale2D = 1.5
 CameraZoom = 0.4
@@ -27,7 +26,7 @@ EnableDebugCam = false
 DrawAabbDebug = false
 DrawPolyOutlines = false
 BackgroundRectPath = NodePath("ParallaxBackground/ParallaxLayer/ColorRect")
-BackgroundOversize = 3600.0
+BackgroundPaddingPx = 64000.0
 metadata/_edit_vertical_guides_ = [-12548.0]
 
 [node name="ParallaxBackground" type="ParallaxBackground" parent="."]
@@ -40,8 +39,10 @@ material = SubResource("ShaderMaterial_su48r")
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = -10.0
-offset_right = -10.0
+offset_left = -7.0
+offset_top = -2.0
+offset_right = -7.0
+offset_bottom = -2.0
 grow_horizontal = 2
 grow_vertical = 2
 

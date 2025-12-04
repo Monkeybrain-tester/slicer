@@ -1,0 +1,44 @@
+[gd_scene load_steps=6 format=3 uid="uid://cun1xjg2ydw1t"]
+
+[ext_resource type="Script" uid="uid://dxn0hktjcsl30" path="res://SlicerTestRoom/Player1.cs" id="1_h5lfo"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_nfocx"]
+radius = 0.426269
+height = 1.91089
+
+[sub_resource type="CapsuleMesh" id="CapsuleMesh_l1nkp"]
+
+[sub_resource type="Skin" id="Skin_eup0e"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_uv515"]
+albedo_color = Color(0.330089, 1, 0.879478, 1)
+
+[node name="Player1" type="CharacterBody3D"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 30.0943, 3.20828, 5.76696)
+script = ExtResource("1_h5lfo")
+CameraPath = NodePath("Camera3D")
+WalkSpeed = 10.0
+SprintSpeed = 15.0
+GroundAcceleration = 10.0
+AirAcceleration = 2.0
+GroundFriction = 4000.0
+AirControl = 0.5
+MaxSlopeAngleDegrees = 60.0
+MaxFallSpeed = 120.0
+JumpVelocity = 6.0
+Gravity = -90.0
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.999961, 0.0088487, 0, -0.0088487, 0.999961, 0.0123844, 0.0776062, -0.101573)
+shape = SubResource("CapsuleShape3D_nfocx")
+debug_color = Color(0.173874, 0.552506, 0.878015, 0.42)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1.05382, 0, 0, 0, 1, 0, 0.168858, 0)
+mesh = SubResource("CapsuleMesh_l1nkp")
+skin = SubResource("Skin_eup0e")
+surface_material_override/0 = SubResource("StandardMaterial3D_uv515")
+
+[node name="Camera3D" type="Camera3D" parent="."]
+transform = Transform3D(1, -8.74228e-08, 0, 8.74228e-08, 1, 0, 0, 0, -1, -0.0278087, 0.656559, 0.0130396)
+current = true

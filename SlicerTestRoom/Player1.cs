@@ -53,6 +53,9 @@ public partial class Player1 : CharacterBody3D
 
 	[ExportGroup("Control")]
 	[Export] public bool ControlsEnabled = true;
+	
+	[Export] public float Gravity = -1f; // Set to -1 to use project gravity
+
 
 	// ===============================
 	// ===== INTERNAL VARIABLES =====
@@ -146,6 +149,10 @@ public partial class Player1 : CharacterBody3D
 
 	public override void _PhysicsProcess(double delta)
 	{
+		
+		if (Gravity > 0f && Math.Abs(_gravity - Gravity) > 0.01f)
+	_gravity = Gravity;
+		
 		float dt = (float)delta;
 
 		if (!ControlsEnabled)

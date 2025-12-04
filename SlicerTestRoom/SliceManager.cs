@@ -236,17 +236,17 @@ private void EndAimAndSlice()
 	// ------------------------------------------------------------
 private void ExecuteSlice()
 {
-	// Plane in world, plus the 2D axes we’ll use
+	// Plane in world space
 	var worldPlane = new Plane(_aimNormal, _aimOrigin.Dot(_aimNormal));
 
-	// Axis convention: U = forward (−camera.Z), V = in-plane up (n × U).
-	// We already computed these in EndAimAndSlice();
-	// They define the 3D→2D projection used below.
+	// Cap points (for optional 3D cap mesh)
+	var capPointsWorld = new List<Vector3>();
 
-	var segmentsWorld = new List<(Vector3 A, Vector3 B)>();
-	var capPointsWorld = new List<Vector3>(); // still useful for a visual cap
+	// Final 2D polygons + their materials
+	var finalPolys2D = new List<List<Vector2>>();
+	var finalMats2D  = new List<Material>();
 
-	// Precompute 3 points on the plane and transform per mesh → local plane
+	// 3 points on the world plane (for per-mesh local-plane reconstruction)
 	Vector3 t = BuildPlaneTangent(_aimNormal);
 	Vector3 b = _aimNormal.Cross(t);
 	Vector3 wp0 = _aimOrigin;
@@ -256,12 +256,14 @@ private void ExecuteSlice()
 	foreach (var path in TargetMeshes ?? Array.Empty<NodePath>())
 	{
 		var mi = GetNodeOrNull<MeshInstance3D>(path);
-		if (mi == null || mi.Mesh == null) continue;
+		if (mi == null || mi.Mesh == null)
+			continue;
 
 		var am = ConvertToArrayMesh(mi.Mesh);
-		if (am == null) continue;
+		if (am == null)
+			continue;
 
-		// world plane → local plane via 3-point method
+		// world plane -> local plane via 3-point method
 		var toLocal = mi.GlobalTransform.AffineInverse();
 		Vector3 lp0 = toLocal * wp0;
 		Vector3 lp1 = toLocal * wp1;
@@ -269,148 +271,101 @@ private void ExecuteSlice()
 		Vector3 lN  = (lp1 - lp0).Cross(lp2 - lp0).Normalized();
 		Plane localPlane = new Plane(lN, lp0.Dot(lN));
 
-		// slice: require SectionSegments from SliceMeshUtility
+		// slice this one mesh
 		var res = SliceMeshUtility.Slice(am, localPlane);
 
-		// (optional) keep front/back meshes as you already do
-		if (res.FrontMesh != null) mi.Mesh = res.FrontMesh;
+		// keep front/back meshes as before
+		if (res.FrontMesh != null)
+			mi.Mesh = res.FrontMesh;
+
 		if (KeepBackHalf && res.BackMesh != null)
 		{
-			var back = new MeshInstance3D { Mesh = res.BackMesh, GlobalTransform = mi.GlobalTransform };
+			var back = new MeshInstance3D
+			{
+				Mesh = res.BackMesh,
+				GlobalTransform = mi.GlobalTransform
+			};
 			mi.GetParent().AddChild(back);
 		}
 
-		// collect raw section data
-		if (res.SectionSegments != null && res.SectionSegments.Count > 0)
+		// collect cap points (optional)
+		if (res.SectionLoop != null && res.SectionLoop.Count > 0)
 		{
-			foreach (var seg in res.SectionSegments)
-				segmentsWorld.Add((mi.GlobalTransform * seg.A, mi.GlobalTransform * seg.B));
-		}
-		else if (res.SectionLoop != null && res.SectionLoop.Count > 0)
-		{
-			// legacy point-bag: still add to cap for visuals
 			foreach (var p in res.SectionLoop)
 				capPointsWorld.Add(mi.GlobalTransform * p);
 		}
-	}
 
-	// ----------------------------
-	// PROJECT → 2D & BUILD LOOPS
-	// ----------------------------
-	var segs2D = new List<(Vector2 A, Vector2 B)>(segmentsWorld.Count);
-	foreach (var (A, B) in segmentsWorld)
-	{
-		Vector3 ra = A - _aimOrigin;
-		Vector3 rb = B - _aimOrigin;
-		float ua = ra.Dot(_basisU), va = ra.Dot(_basisV);
-		float ub = rb.Dot(_basisU), vb = rb.Dot(_basisV);
-
-		// Flip V for "up is +Y" in 2D and apply scale
-		segs2D.Add((new Vector2(ua / SliceUnitsPerPixel, -va / SliceUnitsPerPixel),
-					new Vector2(ub / SliceUnitsPerPixel, -vb / SliceUnitsPerPixel)));
-	}
-
-	// Assemble closed loops from segments
-	var loops = BuildLoopsFromSegments2D(segs2D, eps: 0.5f); // tweak eps if needed
-
-	// Classify outer vs holes by area & containment
-	// Convention: positive Area2D => CCW. Depending on your projection flip,
-	// you might find holes come out as positive; we’ll still double-check by containment.
-	var outers = new List<List<Vector2>>();
-	var holes  = new List<List<Vector2>>();
-
-	foreach (var loop in loops)
-	{
-		var clean = loop;
-		if (clean.Count < 3) continue;
-
-		float area = Area2D(clean);
-		// normalize: ensure "outer" are CCW (positive)
-		if (area < 0f) clean.Reverse();
-
-		outers.Add(clean);
-	}
-
-	// Re-run containment to split inner “rings” as holes:
-	// A loop is a hole if it lies inside some larger outer and has opposite winding.
-	// (Because we reversed everything to CCW above, “holes” will naturally appear CW if we detect them raw.)
-	// We’ll test each loop against all others by area & containment.
-	var confirmedOuters = new List<List<Vector2>>();
-	var holeBuckets = new Dictionary<int, List<Vector2[]>>(); // outerIndex -> holes
-
-	// Sort by absolute area descending so big boundaries get considered first
-	var sorted = outers
-		.Select((poly, idx) => (poly, idx, area: Mathf.Abs(Area2D(poly))))
-		.OrderByDescending(x => x.area)
-		.ToList();
-
-	for (int i = 0; i < sorted.Count; i++)
-	{
-		var (polyI, idxI, _) = sorted[i];
-
-		bool containedByAnother = false;
-		for (int j = 0; j < sorted.Count; j++)
+		// collect section segments for THIS mesh
+		var segsWorld = new List<(Vector3 A, Vector3 B)>();
+		if (res.SectionSegments != null && res.SectionSegments.Count > 0)
 		{
-			if (i == j) continue;
-			var (polyJ, idxJ, _) = sorted[j];
-			// quick bbox check can be added; here we just test centroid
-			Vector2 centroid = Vector2.Zero;
-			foreach (var p in polyI) centroid += p; centroid /= polyI.Count;
-
-			if (PointInPoly(centroid, polyJ))
-			{
-				// polyI is a HOLE inside polyJ
-				containedByAnother = true;
-				if (!holeBuckets.TryGetValue(idxJ, out var list)) { list = new List<Vector2[]>(); holeBuckets[idxJ] = list; }
-				list.Add(polyI.ToArray());
-				break;
-			}
+			foreach (var seg in res.SectionSegments)
+				segsWorld.Add((mi.GlobalTransform * seg.A, mi.GlobalTransform * seg.B));
 		}
 
-		if (!containedByAnother)
+		if (segsWorld.Count == 0)
+			continue;
+
+		// 3D => 2D projection for THIS mesh
+		var segs2D = new List<(Vector2 A, Vector2 B)>(segsWorld.Count);
+		foreach (var (A, B) in segsWorld)
 		{
-			confirmedOuters.Add(polyI);
+			Vector3 ra = A - _aimOrigin;
+			Vector3 rb = B - _aimOrigin;
+
+			float ua = ra.Dot(_basisU);
+			float va = ra.Dot(_basisV);
+			float ub = rb.Dot(_basisU);
+			float vb = rb.Dot(_basisV);
+
+			segs2D.Add((
+				new Vector2(ua / SliceUnitsPerPixel, -va / SliceUnitsPerPixel),
+				new Vector2(ub / SliceUnitsPerPixel, -vb / SliceUnitsPerPixel)
+			));
+		}
+
+		// assemble loops for THIS mesh only
+		var loops = BuildLoopsFromSegments2D(segs2D, eps: 0.5f);
+		if (loops == null || loops.Count == 0)
+			continue;
+
+		// figure out which material to use for this mesh
+		Material mat = mi.MaterialOverride;
+		if (mat == null && mi.Mesh.GetSurfaceCount() > 0)
+			mat = mi.Mesh.SurfaceGetMaterial(0);
+
+		// register each loop + matching material
+		foreach (var loop in loops)
+		{
+			if (loop == null || loop.Count < 3)
+				continue;
+
+			finalPolys2D.Add(loop);
+			finalMats2D.Add(mat);
 		}
 	}
 
-	// Subtract holes from each outer using Geometry2D.ClipPolygons
-	var finalPolys = new List<List<Vector2>>();
-	foreach (var outer in confirmedOuters)
-	{
-		// find original index of this outer to fetch its holes
-		int outerIndex = outers.IndexOf(outer);
-		var holesForOuter = holeBuckets.TryGetValue(outerIndex, out var hs) ? hs : new List<Vector2[]>();
-
-		var solids = SubtractHoles(outer.ToArray(), holesForOuter);
-		foreach (var s in solids)
-			if (s != null && s.Length >= 3)
-				finalPolys.Add(new List<Vector2>(s));
-	}
-
-	// If nothing classified, fall back to all assembled loops
-	if (finalPolys.Count == 0)
-		finalPolys = loops;
-
-	// Optional visual cap (3D) from whatever world points we gathered
+	// Optional 3D cap mesh
 	if (ShowCap && capPointsWorld.Count >= 3)
 	{
 		var cap = BuildCap(worldPlane, capPointsWorld, CapMaterial);
-		if (cap != null) AddChild(cap);
+		if (cap != null)
+			AddChild(cap);
 	}
 
-	// ----------------------------
-	// HAND OFF TO 2D
-	// ----------------------------
-	var segments2D = new List<Vector2[]>(); // you can pass thin edges too, if desired
+	// We’re not using standalone segments2D here, but you could fill this if you still want debug lines.
+	var segments2D = new List<Vector2[]>();
 
-	LaunchSlice2D(finalPolys, segments2D);
+	LaunchSlice2D(finalPolys2D, segments2D, finalMats2D);
 }
+
 
 
 	// ------------------------------------------------------------
 	// 2D scene launch / return
 	// ------------------------------------------------------------
-	private void LaunchSlice2D(List<List<Vector2>> polygons2D, List<Vector2[]> segments2D)
+	private void LaunchSlice2D(List<List<Vector2>> polygons2D, List<Vector2[]> segments2D, List<Material> materials2D)
+
 {
 	GD.Print("[SliceManager DEBUG] LaunchSlice2D: path = ", Slice2DScenePath);
 
@@ -441,7 +396,8 @@ private void ExecuteSlice()
 
 	// Pack 2D geometry
 	level.Polygons2D = polygons2D ?? new();
-	level.Segments2D = segments2D ?? new();
+level.Segments2D = segments2D ?? new();
+level.PolygonMaterials2D = materials2D ?? new();;
 
 	// --- Compute player start in slice-space ---
 	// Plane is defined by the aim normal and origin we captured earlier
@@ -450,7 +406,9 @@ private void ExecuteSlice()
 	Vector3 projected = ProjectPointToPlane(playerPos3D, plane);
 	Vector2 start2D = ProjectWorldTo2D(projected);
 
+
 	level.PlayerStart2D = start2D;
+
 
 	GD.Print($"[SliceManager DEBUG] PlayerStart2D={start2D}");
 
@@ -471,6 +429,7 @@ private void ExecuteSlice()
 
 	// Connect the exit signal so we can map the movement back to 3D
 	level.Connect(SliceLevel2D.SignalName.SliceExit, new Callable(this, nameof(OnSliceExit2D)));
+
 }
 
 	
