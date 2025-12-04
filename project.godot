@@ -11,7 +11,11 @@ config_version=5
 [application]
 
 config/name="slicer"
+<<<<<<< Updated upstream
 run/main_scene="uid://c73whxqs1btet"
+=======
+run/main_scene="uid://6ddk6psee6u3"
+>>>>>>> Stashed changes
 config/features=PackedStringArray("4.4", "C#", "Forward Plus")
 config/icon="res://icon.svg"
 
